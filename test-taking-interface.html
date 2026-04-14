@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loophole Online — Test-Taking Interface</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== Reset & Variables ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-page: #f5f5f0;
+      --bg-white: #ffffff;
+      --bg-header: #ffffff;
+      --bg-answer-hover: #f8f8f5;
+      --text-primary: #1a1a1a;
+      --text-secondary: #555555;
+      --text-muted: #999999;
+      --teal: #1a3a4a;
+      --teal-light: #2a5a6a;
+      --border: #d4d4c8;
+      --border-light: #e5e5dc;
+      --green: #2ea44f;
+      --green-bg: #2ea44f;
+      --red: #e54d42;
+      --red-light: rgba(229, 77, 66, 0.08);
+      --yellow: #f5c842;
+      --yellow-bg: rgba(245, 200, 66, 0.15);
+      --flag-orange: #f59e0b;
+      --selected-bg: rgba(46, 164, 79, 0.06);
+      --selected-border: #2ea44f;
+      --radius: 8px;
+      --radius-sm: 6px;
+      --radius-lg: 12px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-page);
+      color: var(--text-primary);
+      overflow: hidden;
+      font-size: 15px;
+    }
+
+    button { cursor: pointer; font-family: inherit; }
+
+    /* ===== Layout ===== */
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: #edf5f2;
+      border: 2px solid var(--text-primary);
+      border-bottom: 1px solid var(--text-primary);
+      border-radius: 0;
+      margin: 0 16px;
+      min-height: 60px;
+    }
+
+    .header-left { display: flex; flex-direction: column; gap: 2px; }
+
+    .section-label {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .question-count {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .timer-value {
+      font-size: 24px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
+    }
+
+    .timer-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--bg-white);
+      color: var(--text-secondary);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .timer-btn:hover { background: var(--bg-answer-hover); }
+
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    .complete-btn {
+      background: var(--yellow);
+      color: var(--text-primary);
+      border: none;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .complete-btn:hover { background: #e6b938; }
+
+    /* ===== Toolbar ===== */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      padding: 6px 16px;
+      margin: 0 16px;
+      min-height: 36px;
+      gap: 4px;
+      background: #edf5f2;
+      border: 2px solid var(--text-primary);
+      border-top: none;
+      border-radius: 0;
+    }
+
+    .tool-btn {
+      background: var(--bg-white);
+      border: 1.5px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 13px;
+      width: 30px;
+      height: 30px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tool-btn:hover { background: var(--bg-answer-hover); color: var(--text-primary); }
+
+    /* ===== Main Split Panel ===== */
+    .main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      margin: 8px 16px;
+      gap: 12px;
+    }
+
+    .left-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+      background: var(--bg-white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+
+    .stimulus-text {
+      max-width: 580px;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--text-primary);
+    }
+    .stimulus-text p { margin-bottom: 16px; }
+
+    .right-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+      background: var(--bg-white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .question-stem {
+      font-size: 16px;
+      line-height: 1.55;
+      font-weight: 600;
+      color: var(--text-primary);
+      padding-bottom: 4px;
+    }
+
+    /* ===== Answers ===== */
+    .answers-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .answer-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      border: 1.5px solid var(--border-light);
+      transition: all 0.12s ease;
+      position: relative;
+      background: var(--bg-white);
+    }
+    .answer-row:hover { background: var(--bg-answer-hover); border-color: var(--border); }
+
+    .answer-row.selected {
+      background: var(--selected-bg);
+      border-color: var(--selected-border);
+    }
+
+    .answer-row.eliminated {
+      opacity: 0.5;
+      background: var(--red-light);
+      border-color: var(--border-light);
+    }
+
+    /* Bubble */
+    .answer-bubble {
+      width: 34px;
+      height: 34px;
+      min-width: 34px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--bg-white);
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+      transition: all 0.12s;
+    }
+    .answer-bubble:hover { border-color: var(--green); color: var(--green); }
+
+    .answer-bubble.filled {
+      background: var(--green-bg);
+      border-color: var(--green-bg);
+      color: white;
+    }
+
+    /* Checkmark for selected */
+    .answer-bubble.filled::after {
+      content: "✓";
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .answer-bubble.filled span { display: none; }
+
+    .answer-text {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      flex: 1;
+      padding-top: 6px;
+    }
+
+    .answer-row.eliminated .answer-text {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+
+    /* Eliminate button */
+    .eliminate-btn {
+      background: none;
+      border: 2px solid transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 4px;
+      opacity: 0;
+      transition: all 0.12s;
+    }
+    .answer-row:hover .eliminate-btn { opacity: 1; }
+    .eliminate-btn:hover { color: var(--red); border-color: var(--red); }
+
+    .eliminate-btn.active {
+      opacity: 1;
+      color: white;
+      background: var(--red);
+      border-color: var(--red);
+    }
+
+    /* ===== Footer / Nav Bar ===== */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      background: var(--bg-white);
+      border: 3px solid var(--text-primary);
+      border-radius: 999px;
+      margin: 0 auto 12px;
+      min-height: 52px;
+      gap: 0;
+      width: fit-content;
+      max-width: calc(100% - 32px);
+    }
+
+    .nav-btn {
+      background: var(--bg-white);
+      border: 2px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 7px 20px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .nav-btn:hover { background: var(--bg-answer-hover); color: var(--text-primary); border-color: var(--text-secondary); }
+    .nav-btn.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+
+    .question-nav {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 12px;
+    }
+
+    .nav-dot {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.12s;
+    }
+    .nav-dot:hover { color: var(--text-primary); }
+
+    .nav-dot.current {
+      border: 4px solid var(--text-primary);
+      background: #d5ece5;
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    .nav-dot.answered {
+      border: 4px solid var(--text-primary);
+      background: #d5ece5;
+      color: var(--text-primary);
+    }
+    .nav-dot.answered.current {
+      border: 4px solid var(--text-primary);
+      background: #d5ece5;
+      box-shadow: none;
+    }
+
+    .nav-dot .flag-icon {
+      position: absolute;
+      top: -5px;
+      right: -3px;
+      font-size: 9px;
+      color: var(--flag-orange);
+    }
+
+    /* ===== Scrollbar ===== */
+    .left-panel::-webkit-scrollbar,
+    .right-panel::-webkit-scrollbar { width: 5px; }
+    .left-panel::-webkit-scrollbar-track,
+    .right-panel::-webkit-scrollbar-track { background: transparent; }
+    .left-panel::-webkit-scrollbar-thumb,
+    .right-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .left-panel::-webkit-scrollbar-thumb:hover,
+    .right-panel::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== Header ===== -->
+    <header class="header">
+      <div class="header-left">
+        <span class="section-label">PT 92 — LR Section 1</span>
+        <span class="question-count">0 / 25 Complete</span>
+      </div>
+
+      <div class="header-center">
+        <button class="timer-btn" title="Rewind">◀</button>
+        <span class="timer-value">27:14</span>
+        <button class="timer-btn" title="Pause">▐▐</button>
+      </div>
+
+      <div class="header-right">
+        <button class="complete-btn">Complete Section</button>
+      </div>
+    </header>
+
+    <!-- ===== Toolbar ===== -->
+    <div class="toolbar">
+      <button class="tool-btn" title="Collapse left panel">←</button>
+    </div>
+
+    <!-- ===== Main Split Panel ===== -->
+    <main class="main">
+
+      <!-- Left Panel — Stimulus -->
+      <div class="left-panel">
+        <div class="stimulus-text">
+          <p>A study of the consumption of smartphones in five countries found that in each country, weights of discarded smartphones decreased significantly over a ten-year period. The researchers concluded that manufacturers had been making smartphones lighter.</p>
+          <p>However, a critic of the study points out that the weights recorded were the weights of smartphones at the time they were discarded, not at the time they were purchased. The critic argues that the decrease in weight could be explained by the fact that newer smartphones are kept for shorter periods before being discarded. Batteries and other components degrade over time, and a smartphone that has been used for three years will weigh slightly less than it did when new due to battery swelling, case wear, and loss of small components.</p>
+          <p>The critic's argument requires which of the following assumptions?</p>
+        </div>
+      </div>
+
+      <!-- Right Panel — Question & Answers -->
+      <div class="right-panel">
+        <div class="question-stem">
+          Which one of the following is an assumption required by the critic's argument?
+        </div>
+
+        <div class="answers-list">
+
+          <!-- Answer A — Selected (green check) -->
+          <div class="answer-row selected">
+            <button class="answer-bubble filled"><span>A</span></button>
+            <span class="answer-text">The decrease in weight of discarded smartphones was not primarily caused by manufacturers using lighter materials in newer models.</span>
+            <button class="eliminate-btn">✕</button>
+          </div>
+
+          <!-- Answer B -->
+          <div class="answer-row">
+            <button class="answer-bubble">B</button>
+            <span class="answer-text">Consumers in all five countries replaced their smartphones at approximately the same rate during the ten-year period.</span>
+            <button class="eliminate-btn">✕</button>
+          </div>
+
+          <!-- Answer C — Eliminated -->
+          <div class="answer-row eliminated">
+            <button class="answer-bubble">C</button>
+            <span class="answer-text">The weight loss experienced by a smartphone over three years of use is large enough to account for the observed decrease in discarded smartphone weights.</span>
+            <button class="eliminate-btn active">✕</button>
+          </div>
+
+          <!-- Answer D -->
+          <div class="answer-row">
+            <button class="answer-bubble">D</button>
+            <span class="answer-text">Manufacturers did not simultaneously make smartphones lighter while consumers also began discarding them sooner.</span>
+            <button class="eliminate-btn">✕</button>
+          </div>
+
+          <!-- Answer E — Eliminated -->
+          <div class="answer-row eliminated">
+            <button class="answer-bubble">E</button>
+            <span class="answer-text">None of the five countries in the study experienced significant changes in the demographics of smartphone consumers during the ten-year period.</span>
+            <button class="eliminate-btn active">✕</button>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+    <!-- ===== Question Navigation Bar ===== -->
+    <footer class="footer">
+      <button class="nav-btn">Prev</button>
+
+      <div class="question-nav">
+        <button class="nav-dot current answered">1</button>
+        <button class="nav-dot">2</button>
+        <button class="nav-dot">3</button>
+        <button class="nav-dot">4</button>
+        <button class="nav-dot">5</button>
+        <button class="nav-dot">6</button>
+        <button class="nav-dot">7</button>
+        <button class="nav-dot">8</button>
+        <button class="nav-dot">9</button>
+        <button class="nav-dot">10</button>
+        <button class="nav-dot">11</button>
+        <button class="nav-dot">12</button>
+        <button class="nav-dot">13</button>
+        <button class="nav-dot">14</button>
+        <button class="nav-dot">15</button>
+        <button class="nav-dot">16</button>
+        <button class="nav-dot">17</button>
+        <button class="nav-dot">18</button>
+      </div>
+
+      <button class="nav-btn">Next</button>
+    </footer>
+
+  </div>
+</body>
+</html>
