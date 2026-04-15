@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import styles from "./page.module.css";
 
 // --- Data ---
@@ -314,7 +314,11 @@ export default function TestTakingInterface() {
   const [timerSeconds, setTimerSeconds] = useState(35 * 60);
   const [timerVisible, setTimerVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [annotations, setAnnotations] = useState<
+    Record<number, Array<{ start: number; end: number; color: string }>>
+  >({});
 
+  const stimulusRef = useRef<HTMLParagraphElement>(null);
 
   const question = QUESTIONS[currentQuestion];
   const totalQuestions = QUESTIONS.length;
@@ -380,19 +384,132 @@ export default function TestTakingInterface() {
   const eliminated = eliminatedAnswers[question.id] || new Set();
   const selected = selectedAnswers[question.id];
 
-  const highlightText = (text: string) => {
-    if (!searchQuery) return text;
-    const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
-    const parts = text.split(regex);
-    return parts.map((part, i) =>
-      regex.test(part) ? (
-        <mark key={i} className={styles.searchHighlight}>
-          {part}
-        </mark>
-      ) : (
-        part
-      )
-    );
+  const getTextOffset = (container: Node, targetNode: Node, offset: number): number => {
+    let total = 0;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      if (node === targetNode) return total + offset;
+      total += node.textContent?.length || 0;
+      node = walker.nextNode();
+    }
+    return total + offset;
+  };
+
+  const applyHighlight = useCallback(
+    (color: string) => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || !selection.anchorNode || !selection.focusNode) return;
+      const container = stimulusRef.current;
+      if (!container || !container.contains(selection.anchorNode) || !container.contains(selection.focusNode)) return;
+
+      const rawStart = getTextOffset(container, selection.anchorNode, selection.anchorOffset);
+      const rawEnd = getTextOffset(container, selection.focusNode, selection.focusOffset);
+      const [start, end] = rawStart < rawEnd ? [rawStart, rawEnd] : [rawEnd, rawStart];
+      if (start === end) return;
+
+      setAnnotations((prev) => ({
+        ...prev,
+        [question.id]: [...(prev[question.id] || []), { start, end, color }],
+      }));
+      selection.removeAllRanges();
+    },
+    [question.id]
+  );
+
+  const eraseHighlight = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.anchorNode || !selection.focusNode) return;
+    const container = stimulusRef.current;
+    if (!container || !container.contains(selection.anchorNode) || !container.contains(selection.focusNode)) return;
+
+    const rawStart = getTextOffset(container, selection.anchorNode, selection.anchorOffset);
+    const rawEnd = getTextOffset(container, selection.focusNode, selection.focusOffset);
+    const [start, end] = rawStart < rawEnd ? [rawStart, rawEnd] : [rawEnd, rawStart];
+
+    setAnnotations((prev) => {
+      const current = prev[question.id] || [];
+      return {
+        ...prev,
+        [question.id]: current.filter((a) => a.end <= start || a.start >= end),
+      };
+    });
+    selection.removeAllRanges();
+  }, [question.id]);
+
+  const renderStyledText = (text: string, isStimulus: boolean): ReactNode => {
+    const colorMap: Record<string, string> = {
+      pink: "var(--highlight-pink)",
+      orange: "var(--highlight-orange)",
+      yellow: "var(--highlight-yellow)",
+    };
+
+    type CharStyle = { bg?: string; underline?: boolean; search?: boolean };
+    const charStyles: CharStyle[] = Array.from({ length: text.length }, () => ({}));
+
+    // Apply color annotations (stimulus only)
+    if (isStimulus) {
+      for (const ann of annotations[question.id] || []) {
+        for (let i = ann.start; i < ann.end && i < text.length; i++) {
+          if (ann.color === "underline") {
+            charStyles[i].underline = true;
+          } else {
+            charStyles[i].bg = ann.color;
+          }
+        }
+      }
+    }
+
+    // Apply search highlights
+    if (searchQuery) {
+      const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        for (let i = match.index; i < match.index + match[0].length; i++) {
+          charStyles[i].search = true;
+        }
+      }
+    }
+
+    // If no styles at all, return plain text
+    if (!searchQuery && !(isStimulus && (annotations[question.id] || []).length > 0)) return text;
+
+    // Group consecutive chars with same style
+    if (text.length === 0) return text;
+    const segments: { text: string; style: CharStyle }[] = [];
+    let curStyle = charStyles[0];
+    let curText = text[0];
+
+    for (let i = 1; i < text.length; i++) {
+      if (charStyles[i].bg === curStyle.bg && charStyles[i].underline === curStyle.underline && charStyles[i].search === curStyle.search) {
+        curText += text[i];
+      } else {
+        segments.push({ text: curText, style: curStyle });
+        curStyle = charStyles[i];
+        curText = text[i];
+      }
+    }
+    segments.push({ text: curText, style: curStyle });
+
+    return segments.map((seg, i) => {
+      if (!seg.style.bg && !seg.style.underline && !seg.style.search) return seg.text;
+      const inlineStyle: CSSProperties = {};
+      if (seg.style.search) {
+        inlineStyle.backgroundColor = "var(--highlight-orange)";
+        inlineStyle.borderRadius = "2px";
+        inlineStyle.padding = "0 1px";
+      } else if (seg.style.bg) {
+        inlineStyle.backgroundColor = colorMap[seg.style.bg] || seg.style.bg;
+        inlineStyle.borderRadius = "2px";
+        inlineStyle.padding = "0 1px";
+      }
+      if (seg.style.underline) {
+        inlineStyle.textDecoration = "underline";
+        inlineStyle.textDecorationThickness = "2px";
+        inlineStyle.textUnderlineOffset = "3px";
+      }
+      return <span key={i} style={inlineStyle}>{seg.text}</span>;
+    });
   };
 
   return (
@@ -458,11 +575,17 @@ export default function TestTakingInterface() {
           />
         </div>
         <div className={styles.toolbarRight}>
-          <button className={styles.highlightBtn} style={{ background: "var(--highlight-pink)" }} title="Pink highlight" />
-          <button className={styles.highlightBtn} style={{ background: "var(--highlight-orange)" }} title="Orange highlight" />
-          <button className={styles.highlightBtn} style={{ background: "var(--highlight-yellow)" }} title="Yellow highlight" />
-          <button className={styles.toolBtn} title="Underline">U̲</button>
-          <button className={styles.toolBtn} title="Eraser">⌫</button>
+          <button className={styles.highlightBtn} title="Pink highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("pink")}>
+            <img src="/icons/Brush_Pink.svg" alt="Pink highlight" width={15} height={16} draggable={false} />
+          </button>
+          <button className={styles.highlightBtn} title="Orange highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("orange")}>
+            <img src="/icons/Brush_Orange.svg" alt="Orange highlight" width={15} height={16} draggable={false} />
+          </button>
+          <button className={styles.highlightBtn} title="Yellow highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("yellow")}>
+            <img src="/icons/Brush_Yellow.svg" alt="Yellow highlight" width={15} height={16} draggable={false} />
+          </button>
+          <button className={styles.toolBtn} title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("underline")}>U̲</button>
+          <button className={styles.toolBtn} title="Eraser" onMouseDown={(e) => e.preventDefault()} onClick={eraseHighlight}>⌫</button>
           <span className={styles.toolbarDivider} />
           <button className={styles.toolBtn} title="Text size">Aa</button>
           <button className={styles.toolBtn} title="Line height">↕</button>
@@ -474,8 +597,8 @@ export default function TestTakingInterface() {
         {/* Left Panel — Stimulus */}
         <div className={styles.leftPanel}>
           <div className={styles.stimulusContent}>
-            <p className={styles.stimulusText}>
-              {highlightText(question.stimulus)}
+            <p className={styles.stimulusText} ref={stimulusRef}>
+              {renderStyledText(question.stimulus, true)}
             </p>
           </div>
         </div>
@@ -486,7 +609,7 @@ export default function TestTakingInterface() {
         {/* Right Panel — Question & Answers */}
         <div className={styles.rightPanel}>
           <div className={styles.questionStem}>
-            <p>{highlightText(question.stem)}</p>
+            <p>{renderStyledText(question.stem, false)}</p>
           </div>
 
           <div className={styles.answersList}>
@@ -512,7 +635,7 @@ export default function TestTakingInterface() {
                   <span
                     className={`${styles.answerText} ${isEliminated ? styles.textEliminated : ""}`}
                   >
-                    {highlightText(answer.text)}
+                    {renderStyledText(answer.text, false)}
                   </span>
 
                   {/* Elimination X */}
