@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loophole Online — Test-Taking Interface</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-page: #fbfbfb;
+      --bg-white: #fbfbfb;
+      --bg-alternate: #eff6f3;
+      --bg-answer-hover: #f7f8f8;
+      --text-primary: #171712;
+      --text-secondary: #3a4445;
+      --text-muted: #91a1a0;
+      --teal: #09b2a8;
+      --teal-light: #0e7c75;
+      --border: #e5e7eb;
+      --border-light: #ebefef;
+      --green: #09b2a8;
+      --red: #ff5a5a;
+      --red-light: rgba(255, 90, 90, 0.08);
+      --flag-orange: #ffab00;
+      --selected-bg: rgba(9, 178, 168, 0.08);
+      --selected-border: #09b2a8;
+      --highlight-pink: #ea6ca9;
+      --highlight-orange: #f59468;
+      --highlight-yellow: #fde047;
+      --radius: 0.5rem;
+      --radius-sm: calc(0.5rem - 4px);
+      --radius-lg: 12px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-page);
+      color: var(--text-primary);
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    button { cursor: pointer; font-family: inherit; }
+
+    /* ===== Layout ===== */
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: var(--bg-page);
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg-alternate);
+      border: 3px solid var(--text-primary);
+      border-bottom: 2px solid var(--text-primary);
+      border-radius: 0;
+      margin: 0 16px;
+      min-height: 60px;
+    }
+
+    .header-left { display: flex; flex-direction: column; gap: 2px; }
+
+    .section-label {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .question-label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .timer-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 16px;
+      border-radius: var(--radius-sm);
+    }
+
+    .timer-value {
+      font-size: 24px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .progress-bar {
+      width: 120px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--teal);
+      border-radius: 2px;
+      width: 78%;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pause-btn {
+      background: var(--bg-white);
+      border: 3px solid var(--text-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .flag-btn {
+      background: var(--bg-white);
+      border: 3px solid var(--text-primary);
+      color: var(--text-primary);
+      font-size: 18px;
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .flag-active {
+      color: var(--flag-orange) !important;
+      background: rgba(255, 171, 0, 0.15);
+    }
+
+    .complete-btn {
+      background: #EAF84F;
+      color: var(--text-primary);
+      border: 3px solid var(--text-primary);
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ===== Toolbar ===== */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      margin: 0 16px;
+      min-height: 40px;
+      background: var(--bg-alternate);
+      border: 3px solid var(--text-primary);
+      border-top: none;
+      border-bottom: none;
+      border-radius: 0;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tool-btn {
+      background: var(--bg-white);
+      border: 2px solid var(--text-primary);
+      color: var(--text-primary);
+      font-size: 13px;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .highlight-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 2px solid var(--text-primary);
+      background: var(--bg-white);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toolbar-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
+    .search-icon {
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-input {
+      background: var(--bg-white);
+      border: 3px solid var(--text-primary);
+      color: var(--text-primary);
+      padding: 5px 10px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      width: 200px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    /* ===== Main Split Panel ===== */
+    .main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      margin: 0 16px;
+      gap: 0;
+    }
+
+    .left-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+      background: var(--bg-white);
+      border: 3px solid var(--text-primary);
+      border-radius: 0;
+    }
+
+    .stimulus-content {
+      max-width: 580px;
+    }
+
+    .stimulus-text {
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+    }
+
+    .right-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+      background: var(--bg-white);
+      border: 3px solid var(--text-primary);
+      border-left: none;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .question-stem {
+      font-size: 18px;
+      line-height: 1.55;
+      color: var(--text-primary);
+      font-weight: 600;
+      padding-bottom: 4px;
+    }
+
+    /* ===== Answers ===== */
+    .answers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .answer-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 0.875rem;
+      border-radius: 0.5rem;
+      border: 3px solid var(--text-primary);
+      position: relative;
+      background: var(--bg-white);
+    }
+
+    .answer-selected {
+      background: var(--selected-bg) !important;
+      border-color: var(--selected-border) !important;
+    }
+
+    .answer-eliminated {
+      opacity: 0.5;
+      background: var(--red-light);
+    }
+
+    .answer-bubble {
+      width: 1.875rem;
+      height: 1.875rem;
+      min-width: 1.875rem;
+      border-radius: 3.75rem;
+      border: 2px solid var(--text-primary);
+      background: var(--bg-white);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      aspect-ratio: 1/1;
+    }
+
+    .bubble-selected {
+      background: var(--green) !important;
+      border-color: var(--green) !important;
+      color: white !important;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .answer-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      flex: 1;
+      padding-top: 6px;
+    }
+
+    .text-eliminated {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+
+    .eliminate-btn {
+      background: none;
+      border: 2px solid transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 4px;
+      opacity: 0;
+    }
+
+    .eliminate-active {
+      opacity: 1 !important;
+      color: white !important;
+      background: var(--red) !important;
+      border-color: var(--red) !important;
+    }
+
+    /* ===== Footer / Navigation Bar ===== */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      background: var(--bg-white);
+      border: 3px solid var(--text-primary);
+      border-radius: 999px;
+      margin: 12px auto 8px;
+      min-height: 52px;
+      gap: 0;
+      width: fit-content;
+      max-width: calc(100% - 32px);
+    }
+
+    .nav-arrow {
+      display: flex;
+      align-items: center;
+    }
+
+    .arrow-btn {
+      background: var(--bg-white);
+      border: 3px solid var(--text-primary);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 7px 20px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .arrow-btn.disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .question-nav {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 12px;
+    }
+
+    .nav-dot {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-current {
+      border: 3px solid var(--text-primary) !important;
+      background: #e2f3f2 !important;
+      color: var(--text-primary) !important;
+      font-weight: 700;
+    }
+
+    .nav-answered {
+      background: #e2f3f2;
+      color: var(--text-primary);
+    }
+
+    .nav-flag {
+      position: absolute;
+      top: -6px;
+      right: -4px;
+      font-size: 10px;
+      color: var(--flag-orange);
+      pointer-events: none;
+    }
+
+    /* ===== Highlights ===== */
+    .hl-pink { background-color: #ea6ca9; border-radius: 2px; padding: 0 1px; }
+    .hl-orange { background-color: #f59468; border-radius: 2px; padding: 0 1px; }
+    .hl-yellow { background-color: #fde047; border-radius: 2px; padding: 0 1px; }
+    .hl-underline { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+    /* ===== Scrollbar ===== */
+    .left-panel::-webkit-scrollbar,
+    .right-panel::-webkit-scrollbar { width: 5px; }
+    .left-panel::-webkit-scrollbar-track,
+    .right-panel::-webkit-scrollbar-track { background: transparent; }
+    .left-panel::-webkit-scrollbar-thumb,
+    .right-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ===== Header ===== -->
+    <header class="header">
+      <div class="header-left">
+        <span class="section-label">PT 92 — LR Section 1</span>
+        <span class="question-label">Question 1 of 18</span>
+      </div>
+
+      <div class="header-center">
+        <div class="timer-area">
+          <span class="timer-value">27:14</span>
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button class="pause-btn" title="Pause section">&#x23F8;</button>
+        <button class="flag-btn flag-active" title="Flag for review">&#x2691;</button>
+        <button class="complete-btn">Complete Section</button>
+      </div>
+    </header>
+
+    <!-- ===== Toolbar ===== -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <span class="search-icon">&#x1F50D;</span>
+        <input class="search-input" type="text" placeholder="Search in text..." />
+      </div>
+      <div class="toolbar-right">
+        <button class="highlight-btn" title="Pink highlight">
+          <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.7661 0.0106131L13.7781 0.00944886C13.8538 0.00246146 13.9601 -0.00643621 14.033 0.00688645C15.6082 0.294698 14.619 2.31182 14.1694 3.06544C13.439 4.28972 12.5801 5.32265 11.6986 6.38264C11.0611 7.15428 10.414 7.91793 9.75753 8.67346C9.73035 9.13197 9.64345 9.48251 9.31267 9.8183C9.97423 11.3892 8.58227 12.8128 7.30516 13.4983C6.23118 14.0616 5.03034 14.3392 3.8181 14.3044C3.56932 14.2995 3.21285 14.2861 2.97719 14.2147C3.03404 14.6328 3.16638 15.2455 2.90389 15.603C2.56831 16.0602 2.00871 16.117 1.55926 15.8017C1.13885 15.3906 1.34921 14.8787 1.35935 14.3481C1.36484 14.061 1.36887 13.9236 1.29828 13.6447C0.737536 13.5462 -0.0598192 13.1361 0.00355655 12.4423C0.0360946 12.0862 0.6416 12.1246 0.904512 12.0419C2.67361 11.4853 2.56377 9.13982 3.9694 8.1699C4.68139 7.67549 5.4003 7.5418 6.24934 7.67086C6.57733 7.24505 6.79331 7.1145 7.31331 6.986C7.37397 6.84704 7.45772 6.71603 7.54825 6.59296C8.07168 5.88141 8.58521 5.18416 9.12517 4.48104C10.1826 3.10417 11.264 1.56948 12.6508 0.503109C12.9796 0.250282 13.3606 0.0804639 13.7661 0.0106131Z" fill="#171712"/><path d="M3.78459 9.57904C4.82266 9.50728 4.37044 10.7004 4.69722 10.7907C5.37562 10.9782 5.75527 10.0209 6.62083 10.4089C7.01755 10.9647 6.43058 11.6417 6.65241 11.9139C6.87086 12.1819 7.82247 11.3988 8.09622 11.6737C8.24361 11.8218 8.34623 12.2199 8.19323 12.3976C7.05153 13.4475 5.52895 13.8934 4.0032 13.9124C3.77516 13.9139 2.72463 13.7848 2.67255 13.8834C2.40533 14.3895 2.98137 15.0619 2.43751 15.5611C0.798058 16.0376 2.59301 13.2613 1.0919 13.1953C0.7951 13.1823 0.481249 12.7874 0.344482 12.5288C2.16661 12.3381 2.43772 11.2738 3.19842 9.86478C3.44091 9.73556 3.52065 9.68345 3.78459 9.57904Z" fill="#FF9EC6"/><path d="M13.7876 0.404429L13.8025 0.402776C13.9841 0.384306 14.1665 0.399468 14.3123 0.520746C14.4413 0.628003 14.4818 0.778255 14.4986 0.938849C14.6557 2.44713 11.8529 5.57804 10.8921 6.75298C10.7032 6.48007 10.5802 6.34468 10.3419 6.11242C9.93434 5.76759 9.45982 5.47419 8.9353 5.34902C10.0371 4.05663 12.0855 0.76449 13.7876 0.404429Z" fill="#FBFBFB"/><path d="M3.427 9.35748C3.67191 8.99017 3.87627 8.70544 4.24448 8.44655C5.89698 7.28476 7.80021 8.60468 8.92346 9.86907C8.97927 9.93187 9.0244 10.1646 9.04653 10.2541C9.17128 10.9968 8.95176 11.4175 8.57875 12.0136C8.47419 11.6129 8.41813 11.4012 7.97396 11.2942L7.75999 11.3072C7.48629 11.3914 7.20954 11.5544 6.919 11.6657C7.1075 10.9495 7.29232 10.1685 6.32652 9.98586C6.20259 9.99774 6.07115 10.0061 5.95102 10.0363C5.58397 10.1604 5.28803 10.403 4.90882 10.558C4.85357 10.2437 4.82374 9.91305 4.66696 9.63819L4.54806 9.50256C4.17875 9.1974 3.85959 9.25278 3.427 9.35748Z" fill="#5B493A"/><path d="M8.73387 5.64038C9.52625 5.89936 10.2103 6.31304 10.6511 7.04622C10.4185 7.29225 9.81771 8.00548 9.62668 8.27403C9.58166 8.22977 9.47598 8.03958 9.42973 7.97676C8.96017 7.3386 8.43195 7.13014 7.7085 6.97991C7.99894 6.66099 8.45626 6.01206 8.73387 5.64038Z" fill="#171712"/><path d="M7.39727 7.34482C7.41022 7.34391 7.42319 7.34307 7.43616 7.34233C8.51364 7.28103 10.0134 8.48896 9.07618 9.51916C9.01334 9.44253 8.9096 9.34215 8.83821 9.26874C8.20275 8.63649 7.44308 8.1429 6.60718 7.81917C6.87375 7.52542 7.01711 7.43927 7.39727 7.34482Z" fill="#FBFBFB"/></svg>
+        </button>
+        <button class="highlight-btn" title="Orange highlight">
+          <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.7661 0.0106131L13.7781 0.00944886C13.8538 0.00246146 13.9601 -0.00643621 14.033 0.00688645C15.6082 0.294698 14.619 2.31182 14.1694 3.06544C13.439 4.28972 12.5801 5.32265 11.6986 6.38264C11.0611 7.15428 10.414 7.91793 9.75753 8.67346C9.73035 9.13197 9.64345 9.48251 9.31267 9.8183C9.97423 11.3892 8.58227 12.8128 7.30516 13.4983C6.23118 14.0616 5.03034 14.3392 3.8181 14.3044C3.56932 14.2995 3.21285 14.2861 2.97719 14.2147C3.03404 14.6328 3.16638 15.2455 2.90389 15.603C2.56831 16.0602 2.00871 16.117 1.55926 15.8017C1.13885 15.3906 1.34921 14.8787 1.35935 14.3481C1.36484 14.061 1.36887 13.9236 1.29828 13.6447C0.737536 13.5462 -0.0598192 13.1361 0.00355655 12.4423C0.0360946 12.0862 0.6416 12.1246 0.904512 12.0419C2.67361 11.4853 2.56377 9.13982 3.9694 8.1699C4.68139 7.67549 5.4003 7.5418 6.24934 7.67086C6.57733 7.24505 6.79331 7.1145 7.31331 6.986C7.37397 6.84704 7.45772 6.71603 7.54825 6.59296C8.07168 5.88141 8.58521 5.18416 9.12517 4.48104C10.1826 3.10417 11.264 1.56948 12.6508 0.503109C12.9796 0.250282 13.3606 0.0804639 13.7661 0.0106131Z" fill="#171712"/><path d="M3.78459 9.57904C4.82266 9.50728 4.37044 10.7004 4.69722 10.7907C5.37562 10.9782 5.75527 10.0209 6.62083 10.4089C7.01755 10.9647 6.43058 11.6417 6.65241 11.9139C6.87086 12.1819 7.82247 11.3988 8.09622 11.6737C8.24361 11.8218 8.34623 12.2199 8.19323 12.3976C7.05153 13.4475 5.52895 13.8934 4.0032 13.9124C3.77516 13.9139 2.72463 13.7848 2.67255 13.8834C2.40533 14.3895 2.98137 15.0619 2.43751 15.5611C0.798058 16.0376 2.59301 13.2613 1.0919 13.1953C0.7951 13.1823 0.481249 12.7874 0.344482 12.5288C2.16661 12.3381 2.43772 11.2738 3.19842 9.86478C3.44091 9.73556 3.52065 9.68345 3.78459 9.57904Z" fill="#FFB380"/><path d="M13.7876 0.404429L13.8025 0.402776C13.9841 0.384306 14.1665 0.399468 14.3123 0.520746C14.4413 0.628003 14.4818 0.778255 14.4986 0.938849C14.6557 2.44713 11.8529 5.57804 10.8921 6.75298C10.7032 6.48007 10.5802 6.34468 10.3419 6.11242C9.93434 5.76759 9.45982 5.47419 8.9353 5.34902C10.0371 4.05663 12.0855 0.76449 13.7876 0.404429Z" fill="#FBFBFB"/><path d="M3.427 9.35748C3.67191 8.99017 3.87627 8.70544 4.24448 8.44655C5.89698 7.28476 7.80021 8.60468 8.92346 9.86907C8.97927 9.93187 9.0244 10.1646 9.04653 10.2541C9.17128 10.9968 8.95176 11.4175 8.57875 12.0136C8.47419 11.6129 8.41813 11.4012 7.97396 11.2942L7.75999 11.3072C7.48629 11.3914 7.20954 11.5544 6.919 11.6657C7.1075 10.9495 7.29232 10.1685 6.32652 9.98586C6.20259 9.99774 6.07115 10.0061 5.95102 10.0363C5.58397 10.1604 5.28803 10.403 4.90882 10.558C4.85357 10.2437 4.82374 9.91305 4.66696 9.63819L4.54806 9.50256C4.17875 9.1974 3.85959 9.25278 3.427 9.35748Z" fill="#5B493A"/><path d="M8.73387 5.64038C9.52625 5.89936 10.2103 6.31304 10.6511 7.04622C10.4185 7.29225 9.81771 8.00548 9.62668 8.27403C9.58166 8.22977 9.47598 8.03958 9.42973 7.97676C8.96017 7.3386 8.43195 7.13014 7.7085 6.97991C7.99894 6.66099 8.45626 6.01206 8.73387 5.64038Z" fill="#171712"/><path d="M7.39727 7.34482C7.41022 7.34391 7.42319 7.34307 7.43616 7.34233C8.51364 7.28103 10.0134 8.48896 9.07618 9.51916C9.01334 9.44253 8.9096 9.34215 8.83821 9.26874C8.20275 8.63649 7.44308 8.1429 6.60718 7.81917C6.87375 7.52542 7.01711 7.43927 7.39727 7.34482Z" fill="#FBFBFB"/></svg>
+        </button>
+        <button class="highlight-btn" title="Yellow highlight">
+          <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.7661 0.0106131L13.7781 0.00944886C13.8538 0.00246146 13.9601 -0.00643621 14.033 0.00688645C15.6082 0.294698 14.619 2.31182 14.1694 3.06544C13.439 4.28972 12.5801 5.32265 11.6986 6.38264C11.0611 7.15428 10.414 7.91793 9.75753 8.67346C9.73035 9.13197 9.64345 9.48251 9.31267 9.8183C9.97423 11.3892 8.58227 12.8128 7.30516 13.4983C6.23118 14.0616 5.03034 14.3392 3.8181 14.3044C3.56932 14.2995 3.21285 14.2861 2.97719 14.2147C3.03404 14.6328 3.16638 15.2455 2.90389 15.603C2.56831 16.0602 2.00871 16.117 1.55926 15.8017C1.13885 15.3906 1.34921 14.8787 1.35935 14.3481C1.36484 14.061 1.36887 13.9236 1.29828 13.6447C0.737536 13.5462 -0.0598192 13.1361 0.00355655 12.4423C0.0360946 12.0862 0.6416 12.1246 0.904512 12.0419C2.67361 11.4853 2.56377 9.13982 3.9694 8.1699C4.68139 7.67549 5.4003 7.5418 6.24934 7.67086C6.57733 7.24505 6.79331 7.1145 7.31331 6.986C7.37397 6.84704 7.45772 6.71603 7.54825 6.59296C8.07168 5.88141 8.58521 5.18416 9.12517 4.48104C10.1826 3.10417 11.264 1.56948 12.6508 0.503109C12.9796 0.250282 13.3606 0.0804639 13.7661 0.0106131Z" fill="#171712"/><path d="M3.78459 9.57904C4.82266 9.50728 4.37044 10.7004 4.69722 10.7907C5.37562 10.9782 5.75527 10.0209 6.62083 10.4089C7.01755 10.9647 6.43058 11.6417 6.65241 11.9139C6.87086 12.1819 7.82247 11.3988 8.09622 11.6737C8.24361 11.8218 8.34623 12.2199 8.19323 12.3976C7.05153 13.4475 5.52895 13.8934 4.0032 13.9124C3.77516 13.9139 2.72463 13.7848 2.67255 13.8834C2.40533 14.3895 2.98137 15.0619 2.43751 15.5611C0.798058 16.0376 2.59301 13.2613 1.0919 13.1953C0.7951 13.1823 0.481249 12.7874 0.344482 12.5288C2.16661 12.3381 2.43772 11.2738 3.19842 9.86478C3.44091 9.73556 3.52065 9.68345 3.78459 9.57904Z" fill="#FFF176"/><path d="M13.7876 0.404429L13.8025 0.402776C13.9841 0.384306 14.1665 0.399468 14.3123 0.520746C14.4413 0.628003 14.4818 0.778255 14.4986 0.938849C14.6557 2.44713 11.8529 5.57804 10.8921 6.75298C10.7032 6.48007 10.5802 6.34468 10.3419 6.11242C9.93434 5.76759 9.45982 5.47419 8.9353 5.34902C10.0371 4.05663 12.0855 0.76449 13.7876 0.404429Z" fill="#FBFBFB"/><path d="M3.427 9.35748C3.67191 8.99017 3.87627 8.70544 4.24448 8.44655C5.89698 7.28476 7.80021 8.60468 8.92346 9.86907C8.97927 9.93187 9.0244 10.1646 9.04653 10.2541C9.17128 10.9968 8.95176 11.4175 8.57875 12.0136C8.47419 11.6129 8.41813 11.4012 7.97396 11.2942L7.75999 11.3072C7.48629 11.3914 7.20954 11.5544 6.919 11.6657C7.1075 10.9495 7.29232 10.1685 6.32652 9.98586C6.20259 9.99774 6.07115 10.0061 5.95102 10.0363C5.58397 10.1604 5.28803 10.403 4.90882 10.558C4.85357 10.2437 4.82374 9.91305 4.66696 9.63819L4.54806 9.50256C4.17875 9.1974 3.85959 9.25278 3.427 9.35748Z" fill="#5B493A"/><path d="M8.73387 5.64038C9.52625 5.89936 10.2103 6.31304 10.6511 7.04622C10.4185 7.29225 9.81771 8.00548 9.62668 8.27403C9.58166 8.22977 9.47598 8.03958 9.42973 7.97676C8.96017 7.3386 8.43195 7.13014 7.7085 6.97991C7.99894 6.66099 8.45626 6.01206 8.73387 5.64038Z" fill="#171712"/><path d="M7.39727 7.34482C7.41022 7.34391 7.42319 7.34307 7.43616 7.34233C8.51364 7.28103 10.0134 8.48896 9.07618 9.51916C9.01334 9.44253 8.9096 9.34215 8.83821 9.26874C8.20275 8.63649 7.44308 8.1429 6.60718 7.81917C6.87375 7.52542 7.01711 7.43927 7.39727 7.34482Z" fill="#FBFBFB"/></svg>
+        </button>
+        <button class="tool-btn" title="Underline">U&#x0332;</button>
+        <button class="tool-btn" title="Eraser">&#x232B;</button>
+        <span class="toolbar-divider"></span>
+        <button class="tool-btn" title="Text size">Aa</button>
+        <button class="tool-btn" title="Line height">&#x2195;</button>
+      </div>
+    </div>
+
+    <!-- ===== Main Split Panel ===== -->
+    <main class="main">
+
+      <!-- Left Panel — Stimulus -->
+      <div class="left-panel">
+        <div class="stimulus-content">
+          <p class="stimulus-text">A study of the consumption of smartphones in five countries found that in each country, <span class="hl-yellow">weights of discarded smartphones decreased significantly</span> over a ten-year period. The researchers concluded that manufacturers had been making smartphones lighter.
+
+However, a critic of the study points out that <span class="hl-pink">the weights recorded were the weights of smartphones at the time they were discarded</span>, not at the time they were purchased. The critic argues that the decrease in weight could be explained by the fact that <span class="hl-underline">newer smartphones are kept for shorter periods before being discarded</span>. Batteries and other components degrade over time, and a smartphone that has been used for three years will weigh slightly less than it did when new due to <span class="hl-orange">battery swelling, case wear, and loss of small components</span>.
+
+The critic's argument requires which of the following assumptions?</p>
+        </div>
+      </div>
+
+      <!-- Right Panel — Question & Answers -->
+      <div class="right-panel">
+        <div class="question-stem">
+          Which one of the following is an assumption required by the critic's argument?
+        </div>
+
+        <div class="answers-list">
+
+          <!-- Answer A — Selected -->
+          <div class="answer-row answer-selected">
+            <button class="answer-bubble bubble-selected">&#x2713;</button>
+            <span class="answer-text">The decrease in weight of discarded smartphones was not primarily caused by manufacturers using lighter materials in newer models.</span>
+            <button class="eliminate-btn">&#x2715;</button>
+          </div>
+
+          <!-- Answer B -->
+          <div class="answer-row">
+            <button class="answer-bubble">B</button>
+            <span class="answer-text">Consumers in all five countries replaced their smartphones at approximately the same rate during the ten-year period.</span>
+            <button class="eliminate-btn">&#x2715;</button>
+          </div>
+
+          <!-- Answer C — Eliminated -->
+          <div class="answer-row answer-eliminated">
+            <button class="answer-bubble">C</button>
+            <span class="answer-text text-eliminated">The weight loss experienced by a smartphone over three years of use is large enough to account for the observed decrease in discarded smartphone weights.</span>
+            <button class="eliminate-btn eliminate-active">&#x2715;</button>
+          </div>
+
+          <!-- Answer D -->
+          <div class="answer-row">
+            <button class="answer-bubble">D</button>
+            <span class="answer-text">Manufacturers did not simultaneously make smartphones lighter while consumers also began discarding them sooner.</span>
+            <button class="eliminate-btn">&#x2715;</button>
+          </div>
+
+          <!-- Answer E — Eliminated -->
+          <div class="answer-row answer-eliminated">
+            <button class="answer-bubble">E</button>
+            <span class="answer-text text-eliminated">None of the five countries in the study experienced significant changes in the demographics of smartphone consumers during the ten-year period.</span>
+            <button class="eliminate-btn eliminate-active">&#x2715;</button>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+    <!-- ===== Question Navigation Bar ===== -->
+    <footer class="footer">
+      <div class="nav-arrow">
+        <button class="arrow-btn disabled">Prev</button>
+      </div>
+
+      <div class="question-nav">
+        <button class="nav-dot nav-current nav-answered">1<span class="nav-flag">&#x2691;</span></button>
+        <button class="nav-dot nav-answered">2</button>
+        <button class="nav-dot nav-answered">3</button>
+        <button class="nav-dot">4</button>
+        <button class="nav-dot">5</button>
+        <button class="nav-dot">6<span class="nav-flag">&#x2691;</span></button>
+        <button class="nav-dot">7</button>
+        <button class="nav-dot">8</button>
+        <button class="nav-dot">9</button>
+        <button class="nav-dot">10</button>
+        <button class="nav-dot">11</button>
+        <button class="nav-dot">12</button>
+        <button class="nav-dot">13</button>
+        <button class="nav-dot">14</button>
+        <button class="nav-dot">15</button>
+        <button class="nav-dot">16</button>
+        <button class="nav-dot">17</button>
+        <button class="nav-dot">18</button>
+      </div>
+
+      <div class="nav-arrow">
+        <button class="arrow-btn">Next</button>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>
