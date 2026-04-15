@@ -495,15 +495,9 @@
 }
 
 .navAnswered {
-  border: 4px solid var(--text-primary);
-  background: #d5ece5;
-  color: var(--text-primary);
-}
-
-.navAnswered.navCurrent {
-  border: 4px solid var(--text-primary) !important;
-  background: #d5ece5;
-  box-shadow: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .navFlag {
