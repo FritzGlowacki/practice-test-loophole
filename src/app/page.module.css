@@ -354,9 +354,9 @@
   height: 1.875rem;
   min-width: 1.875rem;
   border-radius: 3.75rem;
-  border: 3px solid var(--text-primary);
-  background: var(--teal);
-  color: var(--bg-white);
+  border: 2px solid var(--text-primary);
+  background: var(--bg-white);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 600;
   display: flex;
@@ -372,9 +372,11 @@
 }
 
 .bubbleSelected {
-  background: var(--green-bg) !important;
-  border-color: var(--green-bg) !important;
+  background: var(--green) !important;
+  border-color: var(--green) !important;
   color: white !important;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .answerText {

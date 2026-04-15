@@ -628,7 +628,7 @@ export default function TestTakingInterface() {
                     onClick={() => selectAnswer(answer.letter)}
                     aria-label={`Select answer ${answer.letter}`}
                   >
-                    {answer.letter}
+                    {isSelected ? "✓" : answer.letter}
                   </button>
 
                   {/* Answer text */}
