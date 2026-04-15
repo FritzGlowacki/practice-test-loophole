@@ -231,6 +231,12 @@
   margin: 0 4px;
 }
 
+.searchIcon {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
 .searchInput {
   background: var(--bg-white);
   border: 1.5px solid var(--teal);
