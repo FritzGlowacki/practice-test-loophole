@@ -314,7 +314,7 @@ export default function TestTakingInterface() {
   const [timerSeconds, setTimerSeconds] = useState(35 * 60);
   const [timerVisible, setTimerVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
+
 
   const question = QUESTIONS[currentQuestion];
   const totalQuestions = QUESTIONS.length;
@@ -381,7 +381,7 @@ export default function TestTakingInterface() {
   const selected = selectedAnswers[question.id];
 
   const highlightText = (text: string) => {
-    if (!searchQuery || !searchOpen) return text;
+    if (!searchQuery) return text;
     const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
     const parts = text.split(regex);
     return parts.map((part, i) =>
@@ -448,23 +448,14 @@ export default function TestTakingInterface() {
       {/* Annotation Toolbar */}
       <div className={styles.toolbar}>
         <div className={styles.toolbarLeft}>
-          <button
-            className={styles.toolBtn}
-            onClick={() => setSearchOpen(!searchOpen)}
-            title="Search text"
-          >
-            🔍
-          </button>
-          {searchOpen && (
-            <input
-              className={styles.searchInput}
-              type="text"
-              placeholder="Search in text..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              autoFocus
-            />
-          )}
+          <span className={styles.searchIcon}>🔍</span>
+          <input
+            className={styles.searchInput}
+            type="text"
+            placeholder="Search in text..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
         <div className={styles.toolbarRight}>
           <button className={styles.highlightBtn} style={{ background: "var(--highlight-pink)" }} title="Pink highlight" />
