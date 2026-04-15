@@ -255,7 +255,7 @@
 }
 
 .searchHighlight {
-  background: var(--highlight-orange);
+  background: var(--search-highlight);
   color: var(--text-primary);
   border-radius: 2px;
   padding: 0 1px;
@@ -289,6 +289,16 @@
   line-height: 1.75;
   color: var(--text-primary);
   white-space: pre-wrap;
+}
+
+.stimulusText ::selection {
+  background: var(--search-highlight);
+  color: var(--text-primary);
+}
+
+.stimulusText ::-moz-selection {
+  background: var(--search-highlight);
+  color: var(--text-primary);
 }
 
 .divider {
