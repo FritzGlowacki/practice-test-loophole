@@ -495,7 +495,7 @@ export default function TestTakingInterface() {
       if (!seg.style.bg && !seg.style.underline && !seg.style.search) return seg.text;
       const inlineStyle: CSSProperties = {};
       if (seg.style.search) {
-        inlineStyle.backgroundColor = "var(--highlight-orange)";
+        inlineStyle.backgroundColor = "var(--search-highlight)";
         inlineStyle.borderRadius = "2px";
         inlineStyle.padding = "0 1px";
       } else if (seg.style.bg) {
@@ -518,7 +518,7 @@ export default function TestTakingInterface() {
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <span className={styles.sectionLabel}>PT 92 — LR Section 1</span>
-          <span className={styles.questionLabel}>Question {question.id} of {totalQuestions}</span>
+          <span className={styles.questionLabel}>{question.id} / {totalQuestions} Complete</span>
         </div>
 
         <div className={styles.headerCenter}>
