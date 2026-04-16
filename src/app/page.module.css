@@ -1225,3 +1225,60 @@
   font-size: 12px;
   font-weight: 800;
 }
+
+/* ===== Camo Screen ===== */
+.camoBadge {
+  display: inline-block;
+  background: var(--turquoise);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--text-primary);
+}
+
+.camoTimerDisplay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.camoTimerValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.camoTimerLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.camoProgressLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.completeBtnDimmed {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Ghost style for original (pre-filled) answer in Camo */
+.answerOriginalGhost {
+  opacity: 0.55;
+}
+
+.bubbleOriginalGhost {
+  background: transparent !important;
+  border: 2px dashed var(--teal) !important;
+  color: var(--teal) !important;
+}
