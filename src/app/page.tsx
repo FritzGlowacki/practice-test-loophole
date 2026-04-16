@@ -366,15 +366,16 @@ export default function TestTakingInterface() {
   const question = QUESTIONS[currentQuestion];
   const totalQuestions = QUESTIONS.length;
 
-  // Timer countdown
+  // Timer countdown — only runs during active test
   useEffect(() => {
+    if (screen !== "test") return;
     const interval = setInterval(() => {
       if (!isPaused) {
         setTimerSeconds((prev) => (prev > 0 ? prev - 1 : 0));
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPaused]);
+  }, [isPaused, screen]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -1000,16 +1001,24 @@ export default function TestTakingInterface() {
             <header className={styles.reviewCardHeader}>
               <h2 className={styles.reviewCardTitle}>Camo Summary</h2>
             </header>
-            {wrongCount > 0 ? (
+            {!camoCompleted ? (
+              <p className={`${styles.camoImprovementMsg} ${styles.camoSkipped}`}>
+                Camo skipped — category data unavailable.
+              </p>
+            ) : wrongCount === 0 ? (
+              <p className={styles.camoImprovementMsg}>Perfect section — no Camo needed!</p>
+            ) : camoBuckets.misread > 0 ? (
               <p className={styles.camoImprovementMsg}>
-                {camoBuckets["self-doubt"] > 0
-                  ? `Nice! You picked up ${camoBuckets["self-doubt"]} point${camoBuckets["self-doubt"] > 1 ? "s" : ""} in Camo.`
-                  : camoBuckets.conceptual > 0
-                  ? `Your Camo score stayed the same. These were tough questions or you rushed through Camo.`
-                  : `Nice! You picked up ${Math.max(0, wrongCount - camoBuckets.conceptual)} point${wrongCount - camoBuckets.conceptual !== 1 ? "s" : ""} in Camo.`}
+                {`Nice! You picked up ${camoBuckets.misread} point${camoBuckets.misread > 1 ? "s" : ""} in Camo.`}
+              </p>
+            ) : camoBuckets["self-doubt"] > 0 ? (
+              <p className={`${styles.camoImprovementMsg} ${styles.camoDecreased}`}>
+                {`You second-guessed yourself on ${camoBuckets["self-doubt"]} question${camoBuckets["self-doubt"] > 1 ? "s" : ""} in Camo. Trust your instincts, my lamb.`}
               </p>
             ) : (
-              <p className={styles.camoImprovementMsg}>Perfect section — no Camo needed!</p>
+              <p className={styles.camoImprovementMsg}>
+                Your Camo score stayed the same. Either these were tough questions or you rushed through Camo.
+              </p>
             )}
             <div className={styles.camoBuckets}>
               <div className={styles.camoBucket}>
@@ -1196,12 +1205,13 @@ export default function TestTakingInterface() {
                       <AnswerCircle letter={r.userAnswer} color={r.userAnswer === "—" ? "var(--pewter)" : r.isCorrect ? "var(--turquoise)" : "var(--perform)"} />
                     </td>
                     <td>
-                      {r.isCorrect ? (
-                        <AnswerCircle letter={r.correctAnswer} color="var(--turquoise)" />
-                      ) : r.userAnswer === "—" ? (
+                      {!r.isInCamo || !r.camoAnswer ? (
                         <span className={styles.tdMuted}>—</span>
                       ) : (
-                        <AnswerCircle letter={r.correctAnswer} color={camoColors[r.camo]} />
+                        <AnswerCircle
+                          letter={r.camoAnswer}
+                          color={r.camoAnswer === r.correctAnswer ? "var(--turquoise)" : camoColors[r.camo]}
+                        />
                       )}
                     </td>
                     <td className={styles.tdRight}>

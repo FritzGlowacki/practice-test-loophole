@@ -950,6 +950,18 @@
   margin: 0;
 }
 
+.camoSkipped {
+  background: var(--sand);
+  border-color: var(--pewter);
+  color: var(--text-muted);
+}
+
+.camoDecreased {
+  background: var(--sangria-lc);
+  border-color: var(--sangria);
+  color: var(--text-secondary);
+}
+
 .reviewScoreDivider {
   width: 3px;
   height: 64px;
