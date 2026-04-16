@@ -346,7 +346,15 @@ export default function TestTakingInterface() {
   >({});
   const [screen, setScreen] = useState<"test" | "transition" | "break" | "camo" | "review">("test");
   const [reviewTab, setReviewTab] = useState<"PT" | "S1" | "S2" | "S3" | "RC">("S1");
-  const [reviewSort, setReviewSort] = useState<"order" | "wrong">("order");
+  const [reviewSort, setReviewSort] = useState<"order" | "wrong" | "camo">("order");
+  const [reviewFilters, setReviewFilters] = useState<{
+    answer: "all" | "correct" | "wrong" | "skipped";
+    camo: "all" | "conceptual" | "misread" | "self-doubt" | "self-confidence";
+    flag: "all" | "flagged";
+    timing: "all" | "time-sink" | "near-pace" | "time-saver";
+  }>({ answer: "all", camo: "all", flag: "all", timing: "all" });
+  const [wajEntries, setWajEntries] = useState<Set<number>>(new Set());
+  const [detailQId, setDetailQId] = useState<number | null>(null);
   const [camoAnswers, setCamoAnswers] = useState<Record<number, string>>({});
   const [camoQuestions, setCamoQuestions] = useState<number[]>([]);
   const [camoCurrentIdx, setCamoCurrentIdx] = useState(0);
@@ -647,10 +655,29 @@ export default function TestTakingInterface() {
     skipped: "var(--pewter)",
   };
 
-  const sortedRows =
-    reviewSort === "wrong"
-      ? [...reviewRows].sort((a, b) => Number(b.repeatWrong) - Number(a.repeatWrong) || Number(!a.isCorrect) - Number(!b.isCorrect))
-      : reviewRows;
+  const camoOrder: Record<string, number> = { conceptual: 0, "self-doubt": 1, misread: 2, "self-confidence": 3, skipped: 4, correct: 5 };
+  const sortedRows = (() => {
+    const base = [...reviewRows];
+    if (reviewSort === "wrong") base.sort((a, b) => Number(b.repeatWrong) - Number(a.repeatWrong) || Number(!a.isCorrect) - Number(!b.isCorrect));
+    else if (reviewSort === "camo") base.sort((a, b) => (camoOrder[a.camo] ?? 9) - (camoOrder[b.camo] ?? 9));
+    return base;
+  })();
+
+  const filteredRows = sortedRows.filter((r) => {
+    if (reviewFilters.answer === "correct" && !r.isCorrect) return false;
+    if (reviewFilters.answer === "wrong" && (r.isCorrect || r.userAnswer === "—")) return false;
+    if (reviewFilters.answer === "skipped" && r.userAnswer !== "—") return false;
+    if (reviewFilters.camo !== "all" && r.camo !== reviewFilters.camo) return false;
+    if (reviewFilters.flag === "flagged" && !r.wasFlagged) return false;
+    if (reviewFilters.timing === "time-sink" && r.delta <= 20) return false;
+    if (reviewFilters.timing === "near-pace" && (r.delta < -15 || r.delta > 20)) return false;
+    if (reviewFilters.timing === "time-saver" && r.delta >= -15) return false;
+    return true;
+  });
+
+  const activeFilterCount = Object.values(reviewFilters).filter((v) => v !== "all").length;
+  const detailRow = detailQId !== null ? reviewRows.find((r) => r.id === detailQId) : null;
+  const detailQ = detailQId !== null ? QUESTIONS.find((q) => q.id === detailQId) : null;
 
   if (screen === "transition") {
     return (
@@ -1035,6 +1062,7 @@ export default function TestTakingInterface() {
                     borderColor: r.isCorrect ? "var(--text-primary)" : camoColors[r.camo],
                   }}
                   title={`${r.citation} · ${r.isCorrect ? "Correct" : labelForCamo(r.camo)} · ${r.time}s`}
+                  onClick={() => setDetailQId(r.id)}
                 >
                   {r.id}
                 </button>
@@ -1073,20 +1101,77 @@ export default function TestTakingInterface() {
             <header className={styles.reviewCardHeader}>
               <h2 className={styles.reviewCardTitle}>Question Review</h2>
               <div className={styles.reviewSortControls}>
-                <button
-                  className={`${styles.reviewSortBtn} ${reviewSort === "order" ? styles.reviewSortActive : ""}`}
-                  onClick={() => setReviewSort("order")}
-                >
-                  Order
-                </button>
-                <button
-                  className={`${styles.reviewSortBtn} ${reviewSort === "wrong" ? styles.reviewSortActive : ""}`}
-                  onClick={() => setReviewSort("wrong")}
-                >
-                  Wrong first
-                </button>
+                <button className={`${styles.reviewSortBtn} ${reviewSort === "order" ? styles.reviewSortActive : ""}`} onClick={() => setReviewSort("order")}>Order</button>
+                <button className={`${styles.reviewSortBtn} ${reviewSort === "wrong" ? styles.reviewSortActive : ""}`} onClick={() => setReviewSort("wrong")}>Wrong first</button>
+                <button className={`${styles.reviewSortBtn} ${reviewSort === "camo" ? styles.reviewSortActive : ""}`} onClick={() => setReviewSort("camo")}>Camo order</button>
               </div>
             </header>
+
+            {/* Filter Bar */}
+            <div className={styles.filterBar}>
+              <span className={styles.filterLabel}>Filters</span>
+
+              {/* Answer filter */}
+              {(["correct", "wrong", "skipped"] as const).map((val) => (
+                <button
+                  key={val}
+                  className={`${styles.filterChip} ${reviewFilters.answer === val ? styles.filterChipActive : ""}`}
+                  onClick={() => setReviewFilters((f) => ({ ...f, answer: f.answer === val ? "all" : val }))}
+                >
+                  {val.charAt(0).toUpperCase() + val.slice(1)}
+                  {reviewFilters.answer === val && <span className={styles.filterChipX}>×</span>}
+                </button>
+              ))}
+
+              <span className={styles.filterDivider} />
+
+              {/* Camo category filter */}
+              {(["conceptual", "misread", "self-doubt", "self-confidence"] as const).map((val) => (
+                <button
+                  key={val}
+                  className={`${styles.filterChip} ${reviewFilters.camo === val ? styles.filterChipActive : ""}`}
+                  style={reviewFilters.camo === val ? { background: camoColors[val], borderColor: camoColors[val], color: "#fff" } : {}}
+                  onClick={() => setReviewFilters((f) => ({ ...f, camo: f.camo === val ? "all" : val }))}
+                >
+                  {labelForCamo(val)}
+                  {reviewFilters.camo === val && <span className={styles.filterChipX}>×</span>}
+                </button>
+              ))}
+
+              <span className={styles.filterDivider} />
+
+              {/* Flag filter */}
+              <button
+                className={`${styles.filterChip} ${reviewFilters.flag === "flagged" ? styles.filterChipActive : ""}`}
+                onClick={() => setReviewFilters((f) => ({ ...f, flag: f.flag === "flagged" ? "all" : "flagged" }))}
+              >
+                ⚑ Flagged
+                {reviewFilters.flag === "flagged" && <span className={styles.filterChipX}>×</span>}
+              </button>
+
+              {/* Timing filter */}
+              {(["time-sink", "near-pace", "time-saver"] as const).map((val) => (
+                <button
+                  key={val}
+                  className={`${styles.filterChip} ${reviewFilters.timing === val ? styles.filterChipActive : ""}`}
+                  onClick={() => setReviewFilters((f) => ({ ...f, timing: f.timing === val ? "all" : val }))}
+                >
+                  {val === "time-sink" ? "Time Sink" : val === "near-pace" ? "Near Pace" : "Time Saver"}
+                  {reviewFilters.timing === val && <span className={styles.filterChipX}>×</span>}
+                </button>
+              ))}
+
+              {activeFilterCount > 0 && (
+                <button
+                  className={styles.filterReset}
+                  onClick={() => setReviewFilters({ answer: "all", camo: "all", flag: "all", timing: "all" })}
+                >
+                  Reset ({activeFilterCount})
+                </button>
+              )}
+
+              <span className={styles.filterCount}>{filteredRows.length} / {reviewRows.length}</span>
+            </div>
 
             <table className={styles.reviewTable}>
               <thead>
@@ -1096,27 +1181,19 @@ export default function TestTakingInterface() {
                   <th>Section</th>
                   <th>Camo</th>
                   <th className={styles.tdRight}>Time</th>
+                  <th className={styles.tdCenter}>WAJ</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map((r) => (
-                  <tr key={r.id}>
+                {filteredRows.map((r) => (
+                  <tr key={r.id} className={styles.reviewTableRow} onClick={() => setDetailQId(r.id)}>
                     <td className={styles.tdQNum}>
                       {r.id}
                       {r.repeatWrong && <span className={styles.repeatBadge} title="Repeat wrong">↻</span>}
                     </td>
                     <td className={styles.tdCitation}>{r.citation}</td>
                     <td>
-                      <AnswerCircle
-                        letter={r.userAnswer}
-                        color={
-                          r.userAnswer === "—"
-                            ? "var(--pewter)"
-                            : r.isCorrect
-                            ? "var(--turquoise)"
-                            : "var(--perform)"
-                        }
-                      />
+                      <AnswerCircle letter={r.userAnswer} color={r.userAnswer === "—" ? "var(--pewter)" : r.isCorrect ? "var(--turquoise)" : "var(--perform)"} />
                     </td>
                     <td>
                       {r.isCorrect ? (
@@ -1129,12 +1206,26 @@ export default function TestTakingInterface() {
                     </td>
                     <td className={styles.tdRight}>
                       <span className={styles.timeMain}>{r.time}s</span>
-                      <span
-                        className={styles.timeDelta}
-                        style={{ color: r.delta < 0 ? "var(--turquoise-hc)" : r.delta > 0 ? "var(--perform)" : "var(--text-muted)" }}
-                      >
+                      <span className={styles.timeDelta} style={{ color: r.delta < 0 ? "var(--turquoise-hc)" : r.delta > 0 ? "var(--perform)" : "var(--text-muted)" }}>
                         {r.delta >= 0 ? `+${r.delta}` : r.delta}s
                       </span>
+                    </td>
+                    <td className={styles.tdCenter} onClick={(e) => e.stopPropagation()}>
+                      {!r.isCorrect && r.userAnswer !== "—" ? (
+                        <button
+                          className={`${styles.wajBtn} ${wajEntries.has(r.id) ? styles.wajBtnActive : ""}`}
+                          onClick={() => setWajEntries((prev) => {
+                            const next = new Set(prev);
+                            next.has(r.id) ? next.delete(r.id) : next.add(r.id);
+                            return next;
+                          })}
+                          title={wajEntries.has(r.id) ? "Remove from WAJ" : "Add to Wrong Answer Journal"}
+                        >
+                          {wajEntries.has(r.id) ? "✓" : "+"}
+                        </button>
+                      ) : (
+                        <span className={styles.tdMuted}>—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -1142,6 +1233,98 @@ export default function TestTakingInterface() {
             </table>
           </section>
         </main>
+
+        {/* Question Detail Drawer */}
+        {detailQId !== null && detailRow && detailQ && (
+          <>
+            <div className={styles.drawerOverlay} onClick={() => setDetailQId(null)} />
+            <aside className={styles.detailDrawer}>
+              <header className={styles.drawerHeader}>
+                <div className={styles.drawerHeaderLeft}>
+                  <span className={styles.drawerQNum}>Q{detailRow.id}</span>
+                  <span className={styles.drawerCitation}>{detailRow.citation}</span>
+                  {!detailRow.isCorrect && detailRow.userAnswer !== "—" && (
+                    <span
+                      className={styles.drawerCamoBadge}
+                      style={{ background: camoColors[detailRow.camo], borderColor: camoColors[detailRow.camo] }}
+                    >
+                      {labelForCamo(detailRow.camo)}
+                    </span>
+                  )}
+                  {detailRow.isCorrect && <span className={styles.drawerCamoBadge} style={{ background: "var(--turquoise)", borderColor: "var(--turquoise)" }}>Correct</span>}
+                </div>
+                <button className={styles.drawerClose} onClick={() => setDetailQId(null)}>✕</button>
+              </header>
+
+              <div className={styles.drawerBody}>
+                {/* Stimulus */}
+                <div className={styles.drawerStimulus}>
+                  <p className={styles.drawerStimulusText}>{detailQ.stimulus}</p>
+                </div>
+
+                {/* Question stem */}
+                <p className={styles.drawerStem}>{detailQ.stem}</p>
+
+                {/* Answers */}
+                <div className={styles.drawerAnswers}>
+                  {detailQ.answers.map((ans) => {
+                    const isCorrect = ans.letter === detailQ.correctAnswer;
+                    const wasSelected = ans.letter === detailRow.userAnswer;
+                    const wasCamo = ans.letter === detailRow.camoAnswer;
+                    return (
+                      <div
+                        key={ans.letter}
+                        className={`${styles.drawerAnswer} ${isCorrect ? styles.drawerAnswerCorrect : ""} ${wasSelected && !isCorrect ? styles.drawerAnswerWrong : ""}`}
+                      >
+                        <span className={styles.drawerAnswerLetter}>{ans.letter}</span>
+                        <span className={styles.drawerAnswerText}>{ans.text}</span>
+                        <div className={styles.drawerAnswerTags}>
+                          {wasSelected && <span className={styles.drawerTag} title="Your section answer">S</span>}
+                          {wasCamo && wasCamo !== wasSelected && <span className={`${styles.drawerTag} ${styles.drawerTagCamo}`} title="Your Camo answer">C</span>}
+                          {isCorrect && <span className={`${styles.drawerTag} ${styles.drawerTagCorrect}`} title="Correct answer">✓</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Timing */}
+                <div className={styles.drawerStats}>
+                  <div className={styles.drawerStat}>
+                    <span className={styles.drawerStatValue}>{detailRow.time}s</span>
+                    <span className={styles.drawerStatLabel}>Time spent</span>
+                  </div>
+                  <div className={styles.drawerStat}>
+                    <span className={styles.drawerStatValue} style={{ color: detailRow.delta < 0 ? "var(--turquoise-hc)" : detailRow.delta > 0 ? "var(--perform)" : "var(--text-muted)" }}>
+                      {detailRow.delta >= 0 ? `+${detailRow.delta}` : detailRow.delta}s
+                    </span>
+                    <span className={styles.drawerStatLabel}>vs pace</span>
+                  </div>
+                  {detailRow.wasFlagged && (
+                    <div className={styles.drawerStat}>
+                      <span className={styles.drawerStatValue}>⚑</span>
+                      <span className={styles.drawerStatLabel}>Flagged</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* WAJ quick-add */}
+                {!detailRow.isCorrect && detailRow.userAnswer !== "—" && (
+                  <button
+                    className={`${styles.drawerWajBtn} ${wajEntries.has(detailRow.id) ? styles.drawerWajBtnActive : ""}`}
+                    onClick={() => setWajEntries((prev) => {
+                      const next = new Set(prev);
+                      next.has(detailRow.id) ? next.delete(detailRow.id) : next.add(detailRow.id);
+                      return next;
+                    })}
+                  >
+                    {wajEntries.has(detailRow.id) ? "✓ In Wrong Answer Journal" : "+ Add to Wrong Answer Journal"}
+                  </button>
+                )}
+              </div>
+            </aside>
+          </>
+        )}
       </div>
     );
   }
