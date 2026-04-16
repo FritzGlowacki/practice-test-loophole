@@ -3,6 +3,86 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import styles from "./page.module.css";
 
+// --- PT Launch Data ---
+
+type SectionType = "LR1" | "LR2" | "RC" | "Exp";
+type SectionStatus = "not-started" | "in-progress" | "completed";
+
+interface PTSectionData {
+  pt: number;
+  section: SectionType;
+  status: SectionStatus;
+  score?: number;
+}
+
+const SECTION_COLORS: Record<SectionType, string> = {
+  LR1: "var(--turquoise)",
+  LR2: "var(--cornflower)",
+  RC: "var(--mango)",
+  Exp: "var(--pewter)",
+};
+
+const PT_DATA: PTSectionData[] = [
+  // PT 88
+  { pt: 88, section: "LR1", status: "completed", score: 158 },
+  { pt: 88, section: "LR2", status: "completed", score: 161 },
+  { pt: 88, section: "RC",  status: "completed", score: 155 },
+  { pt: 88, section: "Exp", status: "not-started" },
+  // PT 89
+  { pt: 89, section: "LR1", status: "completed", score: 163 },
+  { pt: 89, section: "LR2", status: "in-progress" },
+  { pt: 89, section: "RC",  status: "not-started" },
+  { pt: 89, section: "Exp", status: "not-started" },
+  // PT 90
+  { pt: 90, section: "LR1", status: "not-started" },
+  { pt: 90, section: "LR2", status: "not-started" },
+  { pt: 90, section: "RC",  status: "not-started" },
+  { pt: 90, section: "Exp", status: "not-started" },
+  // PT 91
+  { pt: 91, section: "LR1", status: "not-started" },
+  { pt: 91, section: "LR2", status: "not-started" },
+  { pt: 91, section: "RC",  status: "not-started" },
+  { pt: 91, section: "Exp", status: "not-started" },
+  // PT 92 — the one we practiced
+  { pt: 92, section: "LR1", status: "completed", score: 162 },
+  { pt: 92, section: "LR2", status: "not-started" },
+  { pt: 92, section: "RC",  status: "not-started" },
+  { pt: 92, section: "Exp", status: "not-started" },
+  // PT 93
+  { pt: 93, section: "LR1", status: "not-started" },
+  { pt: 93, section: "LR2", status: "not-started" },
+  { pt: 93, section: "RC",  status: "not-started" },
+  { pt: 93, section: "Exp", status: "not-started" },
+  // PT 94
+  { pt: 94, section: "LR1", status: "not-started" },
+  { pt: 94, section: "LR2", status: "not-started" },
+  { pt: 94, section: "RC",  status: "not-started" },
+  { pt: 94, section: "Exp", status: "not-started" },
+  // PT 95-101
+  ...[95,96,97,98,99,100,101].flatMap(pt => (
+    (["LR1","LR2","RC","Exp"] as SectionType[]).map(section => ({ pt, section, status: "not-started" as SectionStatus }))
+  )),
+  // PT 102-108
+  ...[102,103,104,105,106,107,108].flatMap(pt => (
+    (["LR1","LR2","RC","Exp"] as SectionType[]).map(section => ({ pt, section, status: "not-started" as SectionStatus }))
+  )),
+];
+
+const PT_GROUPS = [
+  { label: "PT 88–94", pts: [88,89,90,91,92,93,94] },
+  { label: "PT 95–101", pts: [95,96,97,98,99,100,101] },
+  { label: "PT 102–108", pts: [102,103,104,105,106,107,108] },
+];
+
+const NAV_ITEMS = [
+  { label: "Chandler's Prep Map", icon: "◈" },
+  { label: "Table # PT", icon: "⊞", active: true },
+  { label: "Workouts & Routines", icon: "⊙" },
+  { label: "Training Camp", icon: "▲" },
+  { label: "Review & Camo", icon: "◎" },
+  { label: "Book Extras", icon: "⊕" },
+];
+
 // --- Data ---
 
 interface Question {
@@ -344,7 +424,12 @@ export default function TestTakingInterface() {
   const [annotations, setAnnotations] = useState<
     Record<number, Array<{ start: number; end: number; color: string }>>
   >({});
-  const [screen, setScreen] = useState<"test" | "transition" | "break" | "camo" | "review">("test");
+  const [screen, setScreen] = useState<"launch" | "test" | "transition" | "break" | "camo" | "review">("launch");
+  const [upNext, setUpNext] = useState<Array<{ pt: number; section: SectionType }>>([]);
+  const [launchSearch, setLaunchSearch] = useState("");
+  const [launchFilterStatus, setLaunchFilterStatus] = useState<"all" | "not-started" | "in-progress" | "completed">("all");
+  const [launchFilterType, setLaunchFilterType] = useState<"all" | SectionType>("all");
+  const [upNextOpen, setUpNextOpen] = useState(false);
   const [reviewTab, setReviewTab] = useState<"PT" | "S1" | "S2" | "S3" | "RC">("S1");
   const [reviewSort, setReviewSort] = useState<"order" | "wrong" | "camo">("order");
   const [reviewFilters, setReviewFilters] = useState<{
@@ -680,6 +765,277 @@ export default function TestTakingInterface() {
   const detailRow = detailQId !== null ? reviewRows.find((r) => r.id === detailQId) : null;
   const detailQ = detailQId !== null ? QUESTIONS.find((q) => q.id === detailQId) : null;
 
+  if (screen === "launch") {
+    const completedSections = PT_DATA.filter(s => s.status === "completed").length;
+    const avgScore = Math.round(
+      PT_DATA.filter(s => s.score).reduce((sum, s) => sum + (s.score || 0), 0) /
+      (PT_DATA.filter(s => s.score).length || 1)
+    );
+
+    const filteredData = PT_DATA.filter(s => {
+      if (launchSearch) {
+        const q = launchSearch.toLowerCase();
+        if (!`pt ${s.pt}`.includes(q) && !s.section.toLowerCase().includes(q)) return false;
+      }
+      if (launchFilterStatus !== "all" && s.status !== launchFilterStatus) return false;
+      if (launchFilterType !== "all" && s.section !== launchFilterType) return false;
+      return true;
+    });
+
+    const toggleUpNext = (pt: number, section: SectionType) => {
+      setUpNext(prev => {
+        const exists = prev.some(s => s.pt === pt && s.section === section);
+        if (exists) return prev.filter(s => !(s.pt === pt && s.section === section));
+        return [...prev, { pt, section }];
+      });
+    };
+
+    return (
+      <div className={styles.launchContainer}>
+        {/* Sidebar */}
+        <aside className={styles.launchSidebar}>
+          <div className={styles.launchSidebarTop}>
+            <span className={styles.launchSidebarBrand}>Chandler&apos;s Prep</span>
+            <div className={styles.launchLogoIcon}>C</div>
+          </div>
+          <div className={styles.launchSidebarSearchWrapper}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" stroke="var(--turquoise-hc)"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="var(--turquoise-hc)"/>
+            </svg>
+            <input
+              className={styles.launchSidebarSearchInput}
+              placeholder="Search..."
+              value={launchSearch}
+              onChange={e => setLaunchSearch(e.target.value)}
+            />
+          </div>
+          <nav className={styles.launchNav}>
+            {NAV_ITEMS.map(item => (
+              <button
+                key={item.label}
+                className={`${styles.launchNavItem} ${item.active ? styles.launchNavItemActive : ""}`}
+              >
+                <span className={styles.launchNavIcon}>{item.icon}</span>
+                <span className={styles.launchNavLabel}>{item.label}</span>
+                <span className={styles.launchNavChevron}>›</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Main */}
+        <main className={styles.launchMain}>
+          {/* Hero section — seafoam bg */}
+          <section className={styles.launchHero}>
+            {/* Top bar */}
+            <div className={styles.launchHeroTopBar}>
+              <div className={styles.launchHeroTopBarLeft} />
+              <div className={styles.launchHeroTopBarRight}>
+                <button className={styles.upNextBtn} onClick={() => setUpNextOpen(o => !o)}>
+                  Up Next
+                  {upNext.length > 0 && <span className={styles.upNextCount}>{upNext.length}</span>}
+                </button>
+                <div className={styles.launchNotifIcon}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="var(--black-loophole)">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Settings chips row */}
+            <div className={styles.launchHeroSettings}>
+              <div className={styles.launchSettingsPill}>
+                <div className={styles.launchSettingsChip}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  <span>Countdown</span>
+                </div>
+                <div className={styles.launchSettingsDivider} />
+                <div className={styles.launchSettingsChip}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                  <span>Score</span>
+                </div>
+                <div className={styles.launchSettingsDivider} />
+                <div className={styles.launchSettingsChip}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <span>Visible</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Large search bar */}
+            <div className={styles.launchHeroSearchWrapper}>
+              <div className={styles.launchHeroSearchIcon}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" stroke="var(--black-loophole)">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </div>
+              <div className={styles.launchHeroSearchDivider} />
+              <input
+                className={styles.launchHeroSearchInput}
+                placeholder="Find PRACTICE TESTS and more..."
+                value={launchSearch}
+                onChange={e => setLaunchSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Filter chips */}
+            <div className={styles.launchHeroFilters}>
+              {(["all","not-started","in-progress","completed"] as const).map(v => (
+                <button
+                  key={v}
+                  className={`${styles.launchHeroChip} ${launchFilterStatus === v ? styles.launchHeroChipActive : ""}`}
+                  onClick={() => setLaunchFilterStatus(v)}
+                >
+                  {v === "all" ? "All" : v === "not-started" ? "Not Started" : v === "in-progress" ? "In Progress" : "Completed"}
+                </button>
+              ))}
+              <div className={styles.launchHeroChipDivider} />
+              {(["all","LR1","LR2","RC","Exp"] as const).map(v => (
+                <button
+                  key={v}
+                  className={`${styles.launchHeroChip} ${launchFilterType === v ? styles.launchHeroChipActive : ""}`}
+                  onClick={() => setLaunchFilterType(v)}
+                >
+                  {v === "all" ? "All Types" : v}
+                </button>
+              ))}
+            </div>
+
+            {/* Score summary bubble */}
+            <div className={styles.launchScoreBubble}>
+              <span className={styles.launchScoreBig}>{avgScore}</span>
+              <div className={styles.launchScoreMeta}>
+                <span className={styles.launchScoreLabel}>Avg Score</span>
+                <span className={styles.launchScoreSub}>{completedSections} sections done</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Up Next panel */}
+          {upNextOpen && upNext.length > 0 && (
+            <div className={styles.upNextPanel}>
+              <div className={styles.upNextHeader}>
+                <span className={styles.upNextTitle}>Up Next</span>
+                <button className={styles.upNextClear} onClick={() => setUpNext([])}>Clear all</button>
+              </div>
+              {upNext.map((item, i) => (
+                <div key={i} className={styles.upNextItem}>
+                  <span className={styles.upNextItemLabel}>PT {item.pt} — {item.section}</span>
+                  <button
+                    className={styles.upNextLaunchBtn}
+                    onClick={() => { setUpNextOpen(false); setScreen("test"); }}
+                  >
+                    Launch →
+                  </button>
+                  <button className={styles.upNextRemove} onClick={() => toggleUpNext(item.pt, item.section)}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Content area */}
+          <div className={styles.launchContent}>
+            {/* Secondary search/sort bar */}
+            <div className={styles.launchContentBar}>
+              <div className={styles.launchContentSearch}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  className={styles.launchContentSearchInput}
+                  placeholder="Filter by PT or section..."
+                  value={launchSearch}
+                  onChange={e => setLaunchSearch(e.target.value)}
+                />
+              </div>
+              <div className={styles.launchContentSort}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--black-loophole)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="6" x2="11" y2="6"/><line x1="4" y1="12" x2="11" y2="12"/>
+                  <line x1="4" y1="18" x2="20" y2="18"/><polyline points="15 9 18 6 21 9"/>
+                </svg>
+                <span>Sort</span>
+              </div>
+            </div>
+
+            {/* Tab strip */}
+            <div className={styles.launchContentTabs}>
+              <button className={`${styles.launchContentTab} ${styles.launchContentTabActive}`}>Sections</button>
+              <button className={styles.launchContentTab}>All PTs</button>
+              <button className={styles.launchContentTab}>Completed</button>
+            </div>
+
+            {/* PT Groups */}
+            <div className={styles.launchGroups}>
+              {PT_GROUPS.map(group => {
+                const groupSections = filteredData.filter(s => group.pts.includes(s.pt));
+                if (groupSections.length === 0) return null;
+                return (
+                  <div key={group.label} className={styles.launchGroup}>
+                    <h3 className={styles.launchGroupLabel}>{group.label}</h3>
+                    <div className={styles.launchTiles}>
+                      {group.pts.flatMap(pt =>
+                        (["LR1","LR2","RC","Exp"] as SectionType[])
+                          .filter(sec => filteredData.some(s => s.pt === pt && s.section === sec))
+                          .map(sec => {
+                            const data = PT_DATA.find(s => s.pt === pt && s.section === sec)!;
+                            const inUpNext = upNext.some(s => s.pt === pt && s.section === sec);
+                            return (
+                              <div
+                                key={`${pt}-${sec}`}
+                                className={`${styles.launchTile} ${data.status === "completed" ? styles.launchTileCompleted : data.status === "in-progress" ? styles.launchTileInProgress : ""}`}
+                              >
+                                <div className={styles.launchTileBadge} style={{ background: data.status === "completed" ? "var(--turquoise-hc)" : data.status === "in-progress" ? "var(--mango)" : "#A6EDE9", borderColor: data.status !== "not-started" ? "var(--white-loophole)" : "var(--black-loophole)" }}>
+                                  <span className={styles.launchTileBadgeText} style={{ color: data.status !== "not-started" ? "#fff" : "var(--black-loophole)" }}>{pt}</span>
+                                </div>
+                                <div className={styles.launchTileBody}>
+                                  <span className={styles.launchTilePT}>PT {pt}</span>
+                                  <span
+                                    className={styles.launchTileSection}
+                                    style={{ color: data.status !== "not-started" ? "var(--white-loophole)" : SECTION_COLORS[sec] }}
+                                  >
+                                    {sec}
+                                  </span>
+                                  {data.score && <span className={styles.launchTileScore} style={{ color: data.status === "completed" ? "var(--white-loophole)" : "var(--black-loophole)" }}>{data.score}</span>}
+                                </div>
+                                {data.status === "in-progress" && <span className={styles.launchTileInProgressBadge}>●</span>}
+                                <div className={styles.launchTileActions}>
+                                  <button
+                                    className={styles.launchTileLaunch}
+                                    onClick={() => setScreen("test")}
+                                    title="Launch Now"
+                                  >▶</button>
+                                  <button
+                                    className={`${styles.launchTileAdd} ${inUpNext ? styles.launchTileAddActive : ""}`}
+                                    onClick={() => toggleUpNext(pt, sec)}
+                                    title={inUpNext ? "Remove from Up Next" : "Add to Up Next"}
+                                  >
+                                    {inUpNext ? "✓" : "+"}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   if (screen === "transition") {
     return (
       <div className={styles.transitionContainer}>
@@ -936,7 +1292,7 @@ export default function TestTakingInterface() {
       <div className={styles.reviewContainer}>
         {/* Top bar */}
         <header className={styles.reviewTopBar}>
-          <button className={styles.reviewBackBtn} onClick={() => setScreen("test")}>
+          <button className={styles.reviewBackBtn} onClick={() => setScreen("launch")}>
             ← My Progress
           </button>
           <span className={styles.reviewBreadcrumb}>Review · PT 92 · LR Section 1</span>
