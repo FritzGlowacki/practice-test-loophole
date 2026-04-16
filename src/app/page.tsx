@@ -305,6 +305,33 @@ Several curators have objected, arguing that part of the educational value of mo
 
 // --- Component ---
 
+function labelForCamo(c: string): string {
+  switch (c) {
+    case "conceptual": return "Conceptual Gap";
+    case "misread": return "Misread";
+    case "self-doubt": return "Self Doubt";
+    case "self-confidence": return "Self Confidence";
+    case "skipped": return "Skipped";
+    default: return "Correct";
+  }
+}
+
+function AnswerCircle({ letter, color }: { letter: string; color: string }) {
+  const isMuted = letter === "—";
+  return (
+    <span
+      className={styles.answerCircle}
+      style={{
+        background: isMuted ? "transparent" : color,
+        borderColor: color,
+        color: isMuted ? color : "#fff",
+      }}
+    >
+      {letter}
+    </span>
+  );
+}
+
 export default function TestTakingInterface() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
@@ -317,6 +344,9 @@ export default function TestTakingInterface() {
   const [annotations, setAnnotations] = useState<
     Record<number, Array<{ start: number; end: number; color: string }>>
   >({});
+  const [screen, setScreen] = useState<"test" | "transition" | "break" | "review">("test");
+  const [reviewTab, setReviewTab] = useState<"PT" | "S1" | "S2" | "S3" | "RC">("S1");
+  const [reviewSort, setReviewSort] = useState<"order" | "wrong">("order");
 
   const stimulusRef = useRef<HTMLParagraphElement>(null);
 
@@ -512,6 +542,416 @@ export default function TestTakingInterface() {
     });
   };
 
+  const answeredCount = Object.keys(selectedAnswers).length;
+  const flaggedCount = flaggedQuestions.size;
+  const elapsedSeconds = 35 * 60 - timerSeconds;
+  const elapsedDisplay = `${Math.floor(elapsedSeconds / 60)}:${(elapsedSeconds % 60).toString().padStart(2, "0")}`;
+
+  // ===== Review data (computed from real answers + mock for camo/timing) =====
+  type CamoCategory = "correct" | "conceptual" | "misread" | "self-doubt" | "self-confidence" | "skipped";
+  const reviewRows = QUESTIONS.map((q, i) => {
+    const userAnswer = selectedAnswers[q.id];
+    const isCorrect = userAnswer === q.correctAnswer;
+    const wasFlagged = flaggedQuestions.has(q.id);
+    // Mock Camo result + timing per question
+    const mockTimings = [85, 72, 95, 110, 65, 88, 130];
+    const time = mockTimings[i] || 90;
+    const targetTime = 90;
+    const delta = time - targetTime;
+    let camo: CamoCategory = "correct";
+    if (!userAnswer) camo = "skipped";
+    else if (!isCorrect) {
+      const cats: CamoCategory[] = ["conceptual", "misread", "self-doubt"];
+      camo = cats[i % cats.length];
+    } else if (wasFlagged) camo = "self-confidence";
+    return {
+      id: q.id,
+      citation: `PT92.S2.Q${q.id}`,
+      userAnswer: userAnswer || "—",
+      correctAnswer: q.correctAnswer,
+      isCorrect,
+      wasFlagged,
+      time,
+      delta,
+      camo,
+      repeatWrong: !isCorrect && i % 3 === 0,
+    };
+  });
+
+  const correctCount = reviewRows.filter((r) => r.isCorrect).length;
+  const wrongCount = reviewRows.filter((r) => !r.isCorrect && r.userAnswer !== "—").length;
+  const skippedCount = reviewRows.filter((r) => r.userAnswer === "—").length;
+  // Mock LSAT scaled score conversion (very rough)
+  const rawScore = correctCount;
+  const scaledScore = Math.round(140 + (rawScore / totalQuestions) * 40);
+
+  const camoBuckets = {
+    conceptual: reviewRows.filter((r) => r.camo === "conceptual").length,
+    misread: reviewRows.filter((r) => r.camo === "misread").length,
+    "self-doubt": reviewRows.filter((r) => r.camo === "self-doubt").length,
+    "self-confidence": reviewRows.filter((r) => r.camo === "self-confidence").length,
+  };
+
+  const camoColors: Record<CamoCategory, string> = {
+    correct: "var(--turquoise)",
+    conceptual: "var(--perform)",
+    misread: "var(--tuna)",
+    "self-doubt": "var(--sangria)",
+    "self-confidence": "var(--cornflower)",
+    skipped: "var(--pewter)",
+  };
+
+  const sortedRows =
+    reviewSort === "wrong"
+      ? [...reviewRows].sort((a, b) => Number(b.repeatWrong) - Number(a.repeatWrong) || Number(!a.isCorrect) - Number(!b.isCorrect))
+      : reviewRows;
+
+  if (screen === "transition") {
+    return (
+      <div className={styles.transitionContainer}>
+        <div className={styles.transitionCard}>
+          <div className={styles.transitionHeader}>
+            <span className={styles.transitionEyebrow}>Section Complete</span>
+            <h1 className={styles.transitionTitle}>PT 92 — LR Section 1</h1>
+            <p className={styles.transitionSubtitle}>
+              You answered {answeredCount} of {totalQuestions} questions
+              {flaggedCount > 0 ? ` · ${flaggedCount} flagged` : ""}
+              {" · "}{elapsedDisplay} elapsed
+            </p>
+          </div>
+
+          <div className={styles.transitionDivider} />
+
+          <h2 className={styles.transitionPrompt}>What's next?</h2>
+
+          <div className={styles.transitionActions}>
+            <button
+              className={`${styles.transitionBtn} ${styles.transitionBtnPrimary}`}
+              onClick={() => setScreen("review")}
+            >
+              <span className={styles.transitionBtnLabel}>Camo Now</span>
+              <span className={styles.transitionBtnDesc}>
+                Review wrong & flagged questions immediately while it's fresh
+              </span>
+            </button>
+
+            <button
+              className={styles.transitionBtn}
+              onClick={() => setScreen("break")}
+            >
+              <span className={styles.transitionBtnLabel}>Camo After a Break</span>
+              <span className={styles.transitionBtnDesc}>
+                Step away first — review with a fresh perspective later
+              </span>
+            </button>
+
+            <button
+              className={styles.transitionBtn}
+              onClick={() => setScreen("review")}
+            >
+              <span className={styles.transitionBtnLabel}>Skip Camo</span>
+              <span className={styles.transitionBtnDesc}>
+                Go straight to your Section Review and analytics
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "break") {
+    return (
+      <div className={styles.transitionContainer}>
+        <div className={styles.transitionCard}>
+          <div className={styles.breakIllustration}>
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+              <ellipse cx="60" cy="92" rx="46" ry="10" fill="var(--text-primary)" opacity="0.08" />
+              <path
+                d="M22 78 Q22 50 60 50 Q98 50 98 78 L98 88 Q98 92 94 92 L26 92 Q22 92 22 88 Z"
+                fill="#f4d8a8"
+                stroke="var(--text-primary)"
+                strokeWidth="2.5"
+              />
+              <path
+                d="M30 60 Q42 38 60 38 Q78 38 90 60"
+                fill="#fbeacb"
+                stroke="var(--text-primary)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <circle cx="48" cy="58" r="3" fill="var(--text-primary)" opacity="0.3" />
+              <circle cx="62" cy="52" r="3" fill="var(--text-primary)" opacity="0.3" />
+              <circle cx="76" cy="58" r="3" fill="var(--text-primary)" opacity="0.3" />
+            </svg>
+          </div>
+
+          <h1 className={styles.transitionTitle}>Camo is Proofing</h1>
+          <p className={styles.breakCopy}>
+            Fresh bread always needs a few hours to proof so it can rise to new heights — just like your Camo.
+          </p>
+
+          <div className={styles.transitionActions}>
+            <button
+              className={`${styles.transitionBtn} ${styles.transitionBtnPrimary}`}
+              onClick={() => setScreen("test")}
+            >
+              <span className={styles.transitionBtnLabel}>Take Another Section</span>
+              <span className={styles.transitionBtnDesc}>
+                Jump into another section while Camo proofs in the background
+              </span>
+            </button>
+
+            <button
+              className={styles.transitionBtn}
+              onClick={() => setScreen("test")}
+            >
+              <span className={styles.transitionBtnLabel}>My Progress</span>
+              <span className={styles.transitionBtnDesc}>
+                See your dashboard and pick up where you left off
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "review") {
+    const tabs: Array<{ id: typeof reviewTab; label: string; locked?: boolean }> = [
+      { id: "PT", label: "PT 92" },
+      { id: "S1", label: "S1 · LR" },
+      { id: "S2", label: "S2 · LR" },
+      { id: "S3", label: "S3 · RC", locked: true },
+      { id: "RC", label: "Exp", locked: true },
+    ];
+
+    return (
+      <div className={styles.reviewContainer}>
+        {/* Top bar */}
+        <header className={styles.reviewTopBar}>
+          <button className={styles.reviewBackBtn} onClick={() => setScreen("test")}>
+            ← My Progress
+          </button>
+          <span className={styles.reviewBreadcrumb}>Review · PT 92 · LR Section 1</span>
+          <button className={styles.reviewMenuBtn} title="Options">⋮</button>
+        </header>
+
+        {/* Section tabs */}
+        <nav className={styles.reviewTabs}>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              className={`${styles.reviewTab} ${reviewTab === t.id ? styles.reviewTabActive : ""} ${t.locked ? styles.reviewTabLocked : ""}`}
+              onClick={() => !t.locked && setReviewTab(t.id)}
+              disabled={t.locked}
+              title={t.locked ? "Complete this section to unlock" : undefined}
+            >
+              {t.label}
+              {t.locked && <span className={styles.reviewTabLock}>🔒</span>}
+            </button>
+          ))}
+        </nav>
+
+        <main className={styles.reviewMain}>
+          {/* Score Card */}
+          <section className={styles.reviewScoreCard}>
+            <div className={styles.reviewScoreLeft}>
+              <span className={styles.reviewScoreLabel}>Section Score</span>
+              <span className={styles.reviewScoreValue}>{scaledScore}</span>
+              <span className={styles.reviewScoreSub}>Scaled · LR equivalent</span>
+            </div>
+            <div className={styles.reviewScoreDivider} />
+            <div className={styles.reviewScoreStats}>
+              <div className={styles.reviewStat}>
+                <span className={styles.reviewStatNum}>{correctCount}</span>
+                <span className={styles.reviewStatLabel}>Correct</span>
+              </div>
+              <div className={styles.reviewStat}>
+                <span className={styles.reviewStatNum}>{wrongCount}</span>
+                <span className={styles.reviewStatLabel}>Wrong</span>
+              </div>
+              <div className={styles.reviewStat}>
+                <span className={styles.reviewStatNum}>{skippedCount}</span>
+                <span className={styles.reviewStatLabel}>Skipped</span>
+              </div>
+              <div className={styles.reviewStat}>
+                <span className={styles.reviewStatNum}>{elapsedDisplay}</span>
+                <span className={styles.reviewStatLabel}>Time</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Camo Summary */}
+          <section className={styles.reviewCard}>
+            <header className={styles.reviewCardHeader}>
+              <h2 className={styles.reviewCardTitle}>Camo Summary</h2>
+              <span className={styles.reviewCardHint}>
+                Nice! You corrected {Math.max(0, wrongCount - camoBuckets.conceptual)} of {wrongCount} questions in Camo.
+              </span>
+            </header>
+            <div className={styles.camoBuckets}>
+              <div className={styles.camoBucket}>
+                <span className={styles.camoDot} style={{ background: camoColors.conceptual }} />
+                <div className={styles.camoBucketBody}>
+                  <span className={styles.camoBucketCount}>{camoBuckets.conceptual}</span>
+                  <span className={styles.camoBucketLabel}>Conceptual Gap</span>
+                </div>
+              </div>
+              <div className={styles.camoBucket}>
+                <span className={styles.camoDot} style={{ background: camoColors.misread }} />
+                <div className={styles.camoBucketBody}>
+                  <span className={styles.camoBucketCount}>{camoBuckets.misread}</span>
+                  <span className={styles.camoBucketLabel}>Misread</span>
+                </div>
+              </div>
+              <div className={styles.camoBucket}>
+                <span className={styles.camoDot} style={{ background: camoColors["self-doubt"] }} />
+                <div className={styles.camoBucketBody}>
+                  <span className={styles.camoBucketCount}>{camoBuckets["self-doubt"]}</span>
+                  <span className={styles.camoBucketLabel}>Self Doubt</span>
+                </div>
+              </div>
+              <div className={styles.camoBucket}>
+                <span className={styles.camoDot} style={{ background: camoColors["self-confidence"] }} />
+                <div className={styles.camoBucketBody}>
+                  <span className={styles.camoBucketCount}>{camoBuckets["self-confidence"]}</span>
+                  <span className={styles.camoBucketLabel}>Self Confidence</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Question Map */}
+          <section className={styles.reviewCard}>
+            <header className={styles.reviewCardHeader}>
+              <h2 className={styles.reviewCardTitle}>Question Map</h2>
+              <span className={styles.reviewCardHint}>
+                Hover for citation · Click to open question detail
+              </span>
+            </header>
+            <div className={styles.questionMap}>
+              {reviewRows.map((r) => (
+                <button
+                  key={r.id}
+                  className={styles.questionMapCell}
+                  style={{
+                    background: r.isCorrect ? "var(--bg-white)" : camoColors[r.camo],
+                    color: r.isCorrect ? "var(--text-primary)" : "#fff",
+                    borderColor: r.isCorrect ? "var(--text-primary)" : camoColors[r.camo],
+                  }}
+                  title={`${r.citation} · ${r.isCorrect ? "Correct" : labelForCamo(r.camo)} · ${r.time}s`}
+                >
+                  {r.id}
+                </button>
+              ))}
+            </div>
+            <div className={styles.questionMapLegend}>
+              <span className={styles.legendItem}>
+                <span className={styles.legendSwatch} style={{ background: "var(--bg-white)", border: "2px solid var(--text-primary)" }} />
+                Correct
+              </span>
+              <span className={styles.legendItem}>
+                <span className={styles.legendSwatch} style={{ background: camoColors.conceptual }} />
+                Conceptual
+              </span>
+              <span className={styles.legendItem}>
+                <span className={styles.legendSwatch} style={{ background: camoColors.misread }} />
+                Misread
+              </span>
+              <span className={styles.legendItem}>
+                <span className={styles.legendSwatch} style={{ background: camoColors["self-doubt"] }} />
+                Self Doubt
+              </span>
+              <span className={styles.legendItem}>
+                <span className={styles.legendSwatch} style={{ background: camoColors["self-confidence"] }} />
+                Self Confidence
+              </span>
+              <span className={styles.legendItem}>
+                <span className={styles.legendSwatch} style={{ background: camoColors.skipped }} />
+                Skipped
+              </span>
+            </div>
+          </section>
+
+          {/* Review Table */}
+          <section className={styles.reviewCard}>
+            <header className={styles.reviewCardHeader}>
+              <h2 className={styles.reviewCardTitle}>Question Review</h2>
+              <div className={styles.reviewSortControls}>
+                <button
+                  className={`${styles.reviewSortBtn} ${reviewSort === "order" ? styles.reviewSortActive : ""}`}
+                  onClick={() => setReviewSort("order")}
+                >
+                  Order
+                </button>
+                <button
+                  className={`${styles.reviewSortBtn} ${reviewSort === "wrong" ? styles.reviewSortActive : ""}`}
+                  onClick={() => setReviewSort("wrong")}
+                >
+                  Wrong first
+                </button>
+              </div>
+            </header>
+
+            <table className={styles.reviewTable}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Question</th>
+                  <th>Section</th>
+                  <th>Camo</th>
+                  <th className={styles.tdRight}>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRows.map((r) => (
+                  <tr key={r.id}>
+                    <td className={styles.tdQNum}>
+                      {r.id}
+                      {r.repeatWrong && <span className={styles.repeatBadge} title="Repeat wrong">↻</span>}
+                    </td>
+                    <td className={styles.tdCitation}>{r.citation}</td>
+                    <td>
+                      <AnswerCircle
+                        letter={r.userAnswer}
+                        color={
+                          r.userAnswer === "—"
+                            ? "var(--pewter)"
+                            : r.isCorrect
+                            ? "var(--turquoise)"
+                            : "var(--perform)"
+                        }
+                      />
+                    </td>
+                    <td>
+                      {r.isCorrect ? (
+                        <AnswerCircle letter={r.correctAnswer} color="var(--turquoise)" />
+                      ) : r.userAnswer === "—" ? (
+                        <span className={styles.tdMuted}>—</span>
+                      ) : (
+                        <AnswerCircle letter={r.correctAnswer} color={camoColors[r.camo]} />
+                      )}
+                    </td>
+                    <td className={styles.tdRight}>
+                      <span className={styles.timeMain}>{r.time}s</span>
+                      <span
+                        className={styles.timeDelta}
+                        style={{ color: r.delta < 0 ? "var(--turquoise-hc)" : r.delta > 0 ? "var(--perform)" : "var(--text-muted)" }}
+                      >
+                        {r.delta >= 0 ? `+${r.delta}` : r.delta}s
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -558,7 +998,7 @@ export default function TestTakingInterface() {
           >
             ⚑
           </button>
-          <button className={styles.completeBtn}>Complete Section</button>
+          <button className={styles.completeBtn} onClick={() => setScreen("transition")}>Complete Section</button>
         </div>
       </header>
 
