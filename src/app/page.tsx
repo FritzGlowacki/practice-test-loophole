@@ -344,9 +344,14 @@ export default function TestTakingInterface() {
   const [annotations, setAnnotations] = useState<
     Record<number, Array<{ start: number; end: number; color: string }>>
   >({});
-  const [screen, setScreen] = useState<"test" | "transition" | "break" | "review">("test");
+  const [screen, setScreen] = useState<"test" | "transition" | "break" | "camo" | "review">("test");
   const [reviewTab, setReviewTab] = useState<"PT" | "S1" | "S2" | "S3" | "RC">("S1");
   const [reviewSort, setReviewSort] = useState<"order" | "wrong">("order");
+  const [camoAnswers, setCamoAnswers] = useState<Record<number, string>>({});
+  const [camoQuestions, setCamoQuestions] = useState<number[]>([]);
+  const [camoCurrentIdx, setCamoCurrentIdx] = useState(0);
+  const [camoTimer, setCamoTimer] = useState(0);
+  const [camoCompleted, setCamoCompleted] = useState(false);
 
   const stimulusRef = useRef<HTMLParagraphElement>(null);
 
@@ -542,35 +547,76 @@ export default function TestTakingInterface() {
     });
   };
 
+  // Camo timer (stopwatch, counts up while on camo screen)
+  useEffect(() => {
+    if (screen !== "camo") return;
+    const interval = setInterval(() => setCamoTimer((p) => p + 1), 1000);
+    return () => clearInterval(interval);
+  }, [screen]);
+
+  const startCamo = useCallback(() => {
+    const wrongIds = QUESTIONS
+      .filter((q) => selectedAnswers[q.id] !== undefined && selectedAnswers[q.id] !== q.correctAnswer)
+      .map((q) => q.id);
+    const flaggedCorrectIds = QUESTIONS
+      .filter((q) => flaggedQuestions.has(q.id) && selectedAnswers[q.id] === q.correctAnswer)
+      .map((q) => q.id);
+    const camoSet = [...new Set([...wrongIds, ...flaggedCorrectIds])].sort((a, b) => a - b);
+    setCamoQuestions(camoSet);
+    setCamoCurrentIdx(0);
+    setCamoAnswers({});
+    setCamoTimer(0);
+    setCamoCompleted(false);
+    setScreen("camo");
+  }, [selectedAnswers, flaggedQuestions]);
+
   const answeredCount = Object.keys(selectedAnswers).length;
   const flaggedCount = flaggedQuestions.size;
   const elapsedSeconds = 35 * 60 - timerSeconds;
   const elapsedDisplay = `${Math.floor(elapsedSeconds / 60)}:${(elapsedSeconds % 60).toString().padStart(2, "0")}`;
 
-  // ===== Review data (computed from real answers + mock for camo/timing) =====
+  // ===== Review data (real answers + real camo if completed, mock timing) =====
   type CamoCategory = "correct" | "conceptual" | "misread" | "self-doubt" | "self-confidence" | "skipped";
   const reviewRows = QUESTIONS.map((q, i) => {
     const userAnswer = selectedAnswers[q.id];
     const isCorrect = userAnswer === q.correctAnswer;
     const wasFlagged = flaggedQuestions.has(q.id);
-    // Mock Camo result + timing per question
-    const mockTimings = [85, 72, 95, 110, 65, 88, 130];
-    const time = mockTimings[i] || 90;
+    const isInCamo = camoQuestions.includes(q.id);
+    const camoAnswer = camoAnswers[q.id];
+    const mockTimings = [85, 72, 95, 110, 65, 88, 130, 78, 102, 91, 67, 115, 83, 99, 74, 108, 86, 93];
+    const time = mockTimings[i % mockTimings.length];
     const targetTime = 90;
     const delta = time - targetTime;
+
     let camo: CamoCategory = "correct";
-    if (!userAnswer) camo = "skipped";
-    else if (!isCorrect) {
-      const cats: CamoCategory[] = ["conceptual", "misread", "self-doubt"];
-      camo = cats[i % cats.length];
-    } else if (wasFlagged) camo = "self-confidence";
+    if (camoCompleted && isInCamo && camoAnswer) {
+      const origCorrect = userAnswer === q.correctAnswer;
+      const camoCor = camoAnswer === q.correctAnswer;
+      if (origCorrect && camoCor) camo = "self-confidence";
+      else if (!origCorrect && camoCor) camo = "misread";
+      else if (!origCorrect && !camoCor) camo = "conceptual";
+      else camo = "self-doubt";
+    } else if (camoCompleted && !isInCamo) {
+      if (!userAnswer) camo = "skipped";
+      // else stays "correct"
+    } else {
+      // Pre-camo mock
+      if (!userAnswer) camo = "skipped";
+      else if (!isCorrect) {
+        const cats: CamoCategory[] = ["conceptual", "misread", "self-doubt"];
+        camo = cats[i % cats.length];
+      } else if (wasFlagged) camo = "self-confidence";
+    }
+
     return {
       id: q.id,
       citation: `PT92.S2.Q${q.id}`,
       userAnswer: userAnswer || "—",
       correctAnswer: q.correctAnswer,
+      camoAnswer: camoAnswer || undefined,
       isCorrect,
       wasFlagged,
+      isInCamo,
       time,
       delta,
       camo,
@@ -627,7 +673,7 @@ export default function TestTakingInterface() {
           <div className={styles.transitionActions}>
             <button
               className={`${styles.transitionBtn} ${styles.transitionBtnPrimary}`}
-              onClick={() => setScreen("review")}
+              onClick={startCamo}
             >
               <span className={styles.transitionBtnLabel}>Camo Now</span>
               <span className={styles.transitionBtnDesc}>
@@ -648,7 +694,7 @@ export default function TestTakingInterface() {
 
           <button
             className={styles.skipCamoBtn}
-            onClick={() => setScreen("review")}
+            onClick={() => { setCamoCompleted(false); setScreen("review"); }}
           >
             If you improve, you really should Camo. But if you insist — <span className={styles.skipCamoUnderline}>Skip Camo</span>
           </button>
@@ -710,6 +756,141 @@ export default function TestTakingInterface() {
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (screen === "camo") {
+    // Edge case: nothing to camo
+    if (camoQuestions.length === 0) {
+      setCamoCompleted(true);
+      setScreen("review");
+      return null;
+    }
+
+    const camoQId = camoQuestions[camoCurrentIdx];
+    const camoQ = QUESTIONS.find((q) => q.id === camoQId)!;
+    const originalAnswer = selectedAnswers[camoQId];
+    const currentCamoAnswer = camoAnswers[camoQId];
+    const camoAnsweredCount = Object.keys(camoAnswers).length;
+    const allCamoAnswered = camoAnsweredCount === camoQuestions.length;
+
+    const selectCamoAnswer = (letter: string) => {
+      setCamoAnswers((prev) => ({ ...prev, [camoQId]: letter }));
+    };
+
+    const sendIt = () => {
+      setCamoCompleted(true);
+      setScreen("review");
+    };
+
+    return (
+      <div className={styles.container}>
+        {/* Camo Header */}
+        <header className={styles.header}>
+          <div className={styles.headerLeft}>
+            <span className={styles.camoBadge}>Camo</span>
+            <span className={styles.sectionLabel}>PT 92 — LR Section 1</span>
+          </div>
+          <div className={styles.headerCenter}>
+            <div className={styles.camoTimerDisplay}>
+              <span className={styles.camoTimerValue}>{formatTime(camoTimer)}</span>
+              <span className={styles.camoTimerLabel}>elapsed</span>
+            </div>
+            <span className={styles.camoProgressLabel}>
+              {camoAnsweredCount} / {camoQuestions.length} confirmed
+            </span>
+          </div>
+          <div className={styles.headerRight}>
+            <button
+              className={`${styles.completeBtn} ${!allCamoAnswered ? styles.completeBtnDimmed : ""}`}
+              onClick={sendIt}
+              title={!allCamoAnswered ? `${camoQuestions.length - camoAnsweredCount} questions left to confirm` : "Submit Camo"}
+            >
+              Send It
+            </button>
+          </div>
+        </header>
+
+        {/* No annotation toolbar in Camo */}
+
+        {/* Split Panel */}
+        <main className={styles.main}>
+          <div className={styles.leftPanel}>
+            <div className={styles.stimulusContent}>
+              <p className={styles.stimulusText}>{camoQ.stimulus}</p>
+            </div>
+          </div>
+          <div className={styles.divider} />
+          <div className={styles.rightPanel}>
+            <div className={styles.questionStem}>
+              <p>{camoQ.stem}</p>
+            </div>
+            <div className={styles.answersList}>
+              {camoQ.answers.map((answer) => {
+                const isOriginal = originalAnswer === answer.letter;
+                const isSelected = currentCamoAnswer === answer.letter;
+
+                return (
+                  <div
+                    key={answer.letter}
+                    className={`${styles.answerRow} ${isSelected ? styles.answerSelected : ""} ${isOriginal && !isSelected ? styles.answerOriginalGhost : ""}`}
+                  >
+                    <button
+                      className={`${styles.answerBubble} ${isSelected ? styles.bubbleSelected : ""} ${isOriginal && !isSelected ? styles.bubbleOriginalGhost : ""}`}
+                      onClick={() => selectCamoAnswer(answer.letter)}
+                      aria-label={`Select answer ${answer.letter}`}
+                    >
+                      {isSelected ? "✓" : answer.letter}
+                    </button>
+                    <span className={styles.answerText}>
+                      {answer.text}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </main>
+
+        {/* Camo Nav Bar */}
+        <footer className={styles.footer}>
+          <div className={styles.navArrow}>
+            <button
+              className={styles.arrowBtn}
+              disabled={camoCurrentIdx === 0}
+              onClick={() => setCamoCurrentIdx((i) => i - 1)}
+            >
+              Prev
+            </button>
+          </div>
+          <div className={styles.questionNav}>
+            {camoQuestions.map((qId, i) => {
+              const isAnswered = !!camoAnswers[qId];
+              const isCurrent = i === camoCurrentIdx;
+              const isWrong = selectedAnswers[qId] !== QUESTIONS.find((q) => q.id === qId)?.correctAnswer;
+              return (
+                <button
+                  key={qId}
+                  className={`${styles.navDot} ${isCurrent ? styles.navCurrent : ""} ${isAnswered ? styles.navAnswered : ""}`}
+                  onClick={() => setCamoCurrentIdx(i)}
+                  title={`Q${qId}${isWrong ? " · wrong on section" : " · flagged"}`}
+                >
+                  {qId}
+                </button>
+              );
+            })}
+          </div>
+          <div className={styles.navArrow}>
+            <button
+              className={styles.arrowBtn}
+              disabled={camoCurrentIdx === camoQuestions.length - 1}
+              onClick={() => setCamoCurrentIdx((i) => i + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </footer>
       </div>
     );
   }
