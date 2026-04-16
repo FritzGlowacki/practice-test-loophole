@@ -622,7 +622,7 @@ export default function TestTakingInterface() {
 
           <div className={styles.transitionDivider} />
 
-          <h2 className={styles.transitionPrompt}>What's next?</h2>
+          <h2 className={styles.transitionPrompt}>Ready for Camo?</h2>
 
           <div className={styles.transitionActions}>
             <button
@@ -644,17 +644,14 @@ export default function TestTakingInterface() {
                 Step away first — review with a fresh perspective later
               </span>
             </button>
-
-            <button
-              className={styles.transitionBtn}
-              onClick={() => setScreen("review")}
-            >
-              <span className={styles.transitionBtnLabel}>Skip Camo</span>
-              <span className={styles.transitionBtnDesc}>
-                Go straight to your Section Review and analytics
-              </span>
-            </button>
           </div>
+
+          <button
+            className={styles.skipCamoBtn}
+            onClick={() => setScreen("review")}
+          >
+            If you improve, you really should Camo. But if you insist — <span className={styles.skipCamoUnderline}>Skip Camo</span>
+          </button>
         </div>
       </div>
     );
@@ -762,6 +759,14 @@ export default function TestTakingInterface() {
               <span className={styles.reviewScoreSub}>Scaled · LR equivalent</span>
             </div>
             <div className={styles.reviewScoreDivider} />
+            <div className={styles.reviewScoreLeft}>
+              <span className={styles.reviewScoreLabel}>Camo Score</span>
+              <span className={`${styles.reviewScoreValue} ${styles.reviewScoreValueCamo}`}>
+                {scaledScore + Math.max(0, wrongCount - camoBuckets.conceptual)}
+              </span>
+              <span className={styles.reviewScoreSub}>After Camo review</span>
+            </div>
+            <div className={styles.reviewScoreDivider} />
             <div className={styles.reviewScoreStats}>
               <div className={styles.reviewStat}>
                 <span className={styles.reviewStatNum}>{correctCount}</span>
@@ -786,10 +791,18 @@ export default function TestTakingInterface() {
           <section className={styles.reviewCard}>
             <header className={styles.reviewCardHeader}>
               <h2 className={styles.reviewCardTitle}>Camo Summary</h2>
-              <span className={styles.reviewCardHint}>
-                Nice! You corrected {Math.max(0, wrongCount - camoBuckets.conceptual)} of {wrongCount} questions in Camo.
-              </span>
             </header>
+            {wrongCount > 0 ? (
+              <p className={styles.camoImprovementMsg}>
+                {camoBuckets["self-doubt"] > 0
+                  ? `Nice! You picked up ${camoBuckets["self-doubt"]} point${camoBuckets["self-doubt"] > 1 ? "s" : ""} in Camo.`
+                  : camoBuckets.conceptual > 0
+                  ? `Your Camo score stayed the same. These were tough questions or you rushed through Camo.`
+                  : `Nice! You picked up ${Math.max(0, wrongCount - camoBuckets.conceptual)} point${wrongCount - camoBuckets.conceptual !== 1 ? "s" : ""} in Camo.`}
+              </p>
+            ) : (
+              <p className={styles.camoImprovementMsg}>Perfect section — no Camo needed!</p>
+            )}
             <div className={styles.camoBuckets}>
               <div className={styles.camoBucket}>
                 <span className={styles.camoDot} style={{ background: camoColors.conceptual }} />
