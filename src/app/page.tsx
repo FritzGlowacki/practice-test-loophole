@@ -430,6 +430,8 @@ export default function TestTakingInterface() {
   const [launchFilterStatus, setLaunchFilterStatus] = useState<"all" | "not-started" | "in-progress" | "completed">("all");
   const [launchFilterType, setLaunchFilterType] = useState<"all" | SectionType>("all");
   const [upNextOpen, setUpNextOpen] = useState(false);
+  const [launchViewLevel, setLaunchViewLevel] = useState<"section" | "pt">("pt");
+  const [ptHistoryOpen, setPtHistoryOpen] = useState(false);
   const [reviewTab, setReviewTab] = useState<"PT" | "S1" | "S2" | "S3" | "RC">("S1");
   const [reviewSort, setReviewSort] = useState<"order" | "wrong" | "camo">("order");
   const [reviewFilters, setReviewFilters] = useState<{
@@ -442,6 +444,31 @@ export default function TestTakingInterface() {
   const [detailQId, setDetailQId] = useState<number | null>(null);
   const [camoAnswers, setCamoAnswers] = useState<Record<number, string>>({});
   const [camoQuestions, setCamoQuestions] = useState<number[]>([]);
+  const [textSize, setTextSize] = useState<"small" | "default" | "large" | "xlarge">("default");
+  const [lineHeight, setLineHeight] = useState<"default" | "medium" | "large">("default");
+  const [textSizeOpen, setTextSizeOpen] = useState(false);
+  const [lineHeightOpen, setLineHeightOpen] = useState(false);
+
+  // Load persisted reading preferences
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ts = window.localStorage.getItem("loophole:textSize");
+    const lh = window.localStorage.getItem("loophole:lineHeight");
+    if (ts === "small" || ts === "default" || ts === "large" || ts === "xlarge") setTextSize(ts);
+    if (lh === "default" || lh === "medium" || lh === "large") setLineHeight(lh);
+  }, []);
+
+  const setPersistedTextSize = useCallback((v: "small" | "default" | "large" | "xlarge") => {
+    setTextSize(v);
+    if (typeof window !== "undefined") window.localStorage.setItem("loophole:textSize", v);
+  }, []);
+  const setPersistedLineHeight = useCallback((v: "default" | "medium" | "large") => {
+    setLineHeight(v);
+    if (typeof window !== "undefined") window.localStorage.setItem("loophole:lineHeight", v);
+  }, []);
+
+  const textSizePx: Record<typeof textSize, number> = { small: 14, default: 16, large: 19, xlarge: 23 };
+  const lineHeightNum: Record<typeof lineHeight, number> = { default: 1.4, medium: 1.65, large: 1.9 };
   const [camoCurrentIdx, setCamoCurrentIdx] = useState(0);
   const [camoTimer, setCamoTimer] = useState(0);
   const [camoCompleted, setCamoCompleted] = useState(false);
@@ -833,91 +860,86 @@ export default function TestTakingInterface() {
               <div className={styles.launchHeroTopBarLeft} />
               <div className={styles.launchHeroTopBarRight}>
                 <button className={styles.upNextBtn} onClick={() => setUpNextOpen(o => !o)}>
-                  Up Next
-                  {upNext.length > 0 && <span className={styles.upNextCount}>{upNext.length}</span>}
+                  <span className={styles.upNextPanelIcon} aria-hidden>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                      <rect x="3" y="5" width="18" height="14" rx="2"/>
+                      <line x1="15" y1="5" x2="15" y2="19"/>
+                    </svg>
+                  </span>
+                  <span className={styles.upNextDivider} aria-hidden />
+                  <span className={styles.upNextLabel}>Up Next</span>
+                  <span className={styles.upNextCount}>{upNext.length}</span>
                 </button>
-                <div className={styles.launchNotifIcon}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="var(--black-loophole)">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                  </svg>
-                </div>
               </div>
             </div>
 
-            {/* Settings chips row */}
+            {/* Settings pill — actual values with trailing dropdown carets */}
             <div className={styles.launchHeroSettings}>
               <div className={styles.launchSettingsPill}>
-                <div className={styles.launchSettingsChip}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                  <span>Countdown</span>
-                </div>
-                <div className={styles.launchSettingsDivider} />
-                <div className={styles.launchSettingsChip}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                  </svg>
-                  <span>Score</span>
-                </div>
-                <div className={styles.launchSettingsDivider} />
-                <div className={styles.launchSettingsChip}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                  </svg>
-                  <span>Visible</span>
-                </div>
+                {[
+                  { icon: (<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>), label: "Countdown" },
+                  { icon: (<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>), label: "35 min" },
+                  { icon: (<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>), label: "Timer" },
+                  { icon: (<><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>), label: "5 min" },
+                  { icon: (<><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></>), label: "Focus" },
+                ].map((item, i) => (
+                  <button key={i} className={styles.launchSettingsBtn}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                      {item.icon}
+                    </svg>
+                    <span>{item.label}</span>
+                    <span className={styles.launchSettingsCaret} aria-hidden>▾</span>
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Large search bar */}
             <div className={styles.launchHeroSearchWrapper}>
-              <div className={styles.launchHeroSearchIcon}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" stroke="var(--black-loophole)">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
+              <div className={styles.launchHeroSearchIcon} aria-hidden>
+                <span className={styles.launchHeroSearchIconLogo}>PB</span>
               </div>
-              <div className={styles.launchHeroSearchDivider} />
               <input
                 className={styles.launchHeroSearchInput}
-                placeholder="Find PRACTICE TESTS and more..."
+                placeholder="Find PRACTICE TESTS and sections"
                 value={launchSearch}
                 onChange={e => setLaunchSearch(e.target.value)}
               />
             </div>
 
-            {/* Filter chips */}
-            <div className={styles.launchHeroFilters}>
-              {(["all","not-started","in-progress","completed"] as const).map(v => (
-                <button
-                  key={v}
-                  className={`${styles.launchHeroChip} ${launchFilterStatus === v ? styles.launchHeroChipActive : ""}`}
-                  onClick={() => setLaunchFilterStatus(v)}
-                >
-                  {v === "all" ? "All" : v === "not-started" ? "Not Started" : v === "in-progress" ? "In Progress" : "Completed"}
-                </button>
-              ))}
-              <div className={styles.launchHeroChipDivider} />
-              {(["all","LR1","LR2","RC","Exp"] as const).map(v => (
-                <button
-                  key={v}
-                  className={`${styles.launchHeroChip} ${launchFilterType === v ? styles.launchHeroChipActive : ""}`}
-                  onClick={() => setLaunchFilterType(v)}
-                >
-                  {v === "all" ? "All Types" : v}
-                </button>
-              ))}
+            {/* Quick action pills */}
+            <div className={styles.launchHeroQuick}>
+              <button
+                className={styles.launchQuickBtn}
+                onClick={() => { setLaunchFilterType("LR1"); setScreen("test"); }}
+              >
+                Next LR
+                <span className={styles.launchQuickPlay}>▶</span>
+              </button>
+              <button
+                className={styles.launchQuickBtn}
+                onClick={() => { setLaunchFilterType("RC"); setScreen("test"); }}
+              >
+                Next RC
+                <span className={styles.launchQuickPlay}>▶</span>
+              </button>
+              <button
+                className={styles.launchQuickBtn}
+                onClick={() => setScreen("test")}
+              >
+                I&apos;m Feeling Lucky!
+                <span className={styles.launchQuickDice} aria-hidden>🎲</span>
+              </button>
             </div>
 
-            {/* Score summary bubble */}
-            <div className={styles.launchScoreBubble}>
-              <span className={styles.launchScoreBig}>{avgScore}</span>
-              <div className={styles.launchScoreMeta}>
-                <span className={styles.launchScoreLabel}>Avg Score</span>
-                <span className={styles.launchScoreSub}>{completedSections} sections done</span>
-              </div>
-            </div>
+            {/* PT History toggle */}
+            <button
+              className={styles.launchPtHistory}
+              onClick={() => setPtHistoryOpen(o => !o)}
+            >
+              <span className={styles.launchPtHistoryChevron} data-open={ptHistoryOpen}>⌄</span>
+              <span>PT History</span>
+            </button>
           </section>
 
           {/* Up Next panel */}
@@ -944,33 +966,88 @@ export default function TestTakingInterface() {
 
           {/* Content area */}
           <div className={styles.launchContent}>
-            {/* Secondary search/sort bar */}
-            <div className={styles.launchContentBar}>
-              <div className={styles.launchContentSearch}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                <input
-                  className={styles.launchContentSearchInput}
-                  placeholder="Filter by PT or section..."
-                  value={launchSearch}
-                  onChange={e => setLaunchSearch(e.target.value)}
-                />
+            {/* Fresh PTs Left card + PT Breakdown bar */}
+            <div className={styles.launchSummaryRow}>
+              <div className={styles.launchFreshCard}>
+                <span className={styles.launchFreshLabel}>Fresh PTs left</span>
+                <div className={styles.launchFreshValueRow}>
+                  <span className={styles.launchFreshValue}>
+                    {PT_DATA.reduce((acc, s) => {
+                      const ptHasAny = PT_DATA.some(p => p.pt === s.pt && p.status !== "not-started");
+                      return acc;
+                    }, 0) || (28 - PT_GROUPS.flatMap(g => g.pts).filter(pt => PT_DATA.some(s => s.pt === pt && s.status !== "not-started")).length)}
+                  </span>
+                  <span className={styles.launchFreshIcon} aria-hidden>🌱</span>
+                </div>
               </div>
-              <div className={styles.launchContentSort}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--black-loophole)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="4" y1="6" x2="11" y2="6"/><line x1="4" y1="12" x2="11" y2="12"/>
-                  <line x1="4" y1="18" x2="20" y2="18"/><polyline points="15 9 18 6 21 9"/>
-                </svg>
-                <span>Sort</span>
+              <div className={styles.launchBreakdownCard}>
+                <span className={styles.launchBreakdownLabel}>PT Breakdown</span>
+                <div className={styles.launchBreakdownBar}>
+                  {(() => {
+                    const all = PT_GROUPS.flatMap(g => g.pts);
+                    const total = all.length;
+                    const completed = all.filter(pt => {
+                      const rows = PT_DATA.filter(s => s.pt === pt);
+                      return rows.length > 0 && rows.every(r => r.status === "completed");
+                    }).length;
+                    const inProgress = all.filter(pt => {
+                      const rows = PT_DATA.filter(s => s.pt === pt);
+                      return rows.some(r => r.status !== "not-started") && !rows.every(r => r.status === "completed");
+                    }).length;
+                    const fresh = total - completed - inProgress;
+                    return (
+                      <>
+                        <div className={styles.launchBreakdownSeg} style={{ width: `${(completed / total) * 100}%`, background: "var(--turquoise-hc)" }} title={`${completed} completed`} />
+                        <div className={styles.launchBreakdownSeg} style={{ width: `${(inProgress / total) * 100}%`, background: "var(--chartreuse)" }} title={`${inProgress} in progress`} />
+                        <div className={styles.launchBreakdownSeg} style={{ width: `${(fresh / total) * 100}%`, background: "var(--turquoise-lc)" }} title={`${fresh} fresh`} />
+                      </>
+                    );
+                  })()}
+                  <span className={styles.launchBreakdownEndIcon} aria-hidden>🌱</span>
+                </div>
               </div>
             </div>
 
-            {/* Tab strip */}
-            <div className={styles.launchContentTabs}>
-              <button className={`${styles.launchContentTab} ${styles.launchContentTabActive}`}>Sections</button>
-              <button className={styles.launchContentTab}>All PTs</button>
-              <button className={styles.launchContentTab}>Completed</button>
+            {/* Level toggle + dropdowns */}
+            <div className={styles.launchContentBar}>
+              <div className={styles.launchLevelToggle}>
+                <button
+                  className={`${styles.launchLevelBtn} ${launchViewLevel === "section" ? styles.launchLevelBtnActive : ""}`}
+                  onClick={() => setLaunchViewLevel("section")}
+                >
+                  Section-Level
+                </button>
+                <button
+                  className={`${styles.launchLevelBtn} ${launchViewLevel === "pt" ? styles.launchLevelBtnActive : ""}`}
+                  onClick={() => setLaunchViewLevel("pt")}
+                >
+                  PT-Level
+                </button>
+              </div>
+              <div className={styles.launchDropdownGroup}>
+                <button
+                  className={`${styles.launchDropdownBtn} ${launchFilterStatus !== "all" ? styles.launchDropdownBtnActive : ""}`}
+                  onClick={() => {
+                    const order = ["all", "not-started", "in-progress", "completed"] as const;
+                    const idx = order.indexOf(launchFilterStatus);
+                    setLaunchFilterStatus(order[(idx + 1) % order.length]);
+                  }}
+                >
+                  {launchFilterStatus === "all" ? "Status" : launchFilterStatus === "not-started" ? "Status: Fresh" : launchFilterStatus === "in-progress" ? "Status: In Progress" : "Status: Completed"}
+                  <span className={styles.launchDropdownCaret}>▾</span>
+                </button>
+                <button
+                  className={`${styles.launchDropdownBtn} ${launchFilterType !== "all" ? styles.launchDropdownBtnActive : ""}`}
+                  onClick={() => {
+                    const order = ["all", "LR1", "LR2", "RC", "Exp"] as const;
+                    const idx = order.indexOf(launchFilterType);
+                    setLaunchFilterType(order[(idx + 1) % order.length]);
+                  }}
+                >
+                  {launchFilterType === "all" ? "Section Type" : `Type: ${launchFilterType}`}
+                  <span className={styles.launchDropdownCaret}>▾</span>
+                </button>
+              </div>
             </div>
 
             {/* PT Groups */}
@@ -982,54 +1059,103 @@ export default function TestTakingInterface() {
                   <div key={group.label} className={styles.launchGroup}>
                     <h3 className={styles.launchGroupLabel}>{group.label}</h3>
                     <div className={styles.launchTiles}>
-                      {group.pts.flatMap(pt =>
-                        (["LR1","LR2","RC","Exp"] as SectionType[])
-                          .filter(sec => filteredData.some(s => s.pt === pt && s.section === sec))
-                          .map(sec => {
-                            const data = PT_DATA.find(s => s.pt === pt && s.section === sec)!;
-                            const inUpNext = upNext.some(s => s.pt === pt && s.section === sec);
+                      {launchViewLevel === "pt"
+                        ? group.pts.map(pt => {
+                            const rows = PT_DATA.filter(s => s.pt === pt);
+                            const anyTouched = rows.some(r => r.status !== "not-started");
+                            const allDone = rows.length > 0 && rows.every(r => r.status === "completed");
+                            const status = allDone ? "completed" : anyTouched ? "in-progress" : "not-started";
+                            const inUpNext = upNext.some(s => s.pt === pt);
+                            const statusLabel = status === "completed" ? "Done" : status === "in-progress" ? "In Progress" : "Fresh to You";
                             return (
                               <div
-                                key={`${pt}-${sec}`}
-                                className={`${styles.launchTile} ${data.status === "completed" ? styles.launchTileCompleted : data.status === "in-progress" ? styles.launchTileInProgress : ""}`}
+                                key={`pt-${pt}`}
+                                className={`${styles.launchPtTile} ${status === "completed" ? styles.launchPtTileCompleted : status === "in-progress" ? styles.launchPtTileInProgress : ""}`}
                               >
-                                <div className={styles.launchTileBadge} style={{ background: data.status === "completed" ? "var(--turquoise-hc)" : data.status === "in-progress" ? "var(--mango)" : "#A6EDE9", borderColor: data.status !== "not-started" ? "var(--white-loophole)" : "var(--black-loophole)" }}>
-                                  <span className={styles.launchTileBadgeText} style={{ color: data.status !== "not-started" ? "#fff" : "var(--black-loophole)" }}>{pt}</span>
-                                </div>
-                                <div className={styles.launchTileBody}>
-                                  <span className={styles.launchTilePT}>PT {pt}</span>
-                                  <span
-                                    className={styles.launchTileSection}
-                                    style={{ color: data.status !== "not-started" ? "var(--white-loophole)" : SECTION_COLORS[sec] }}
-                                  >
-                                    {sec}
-                                  </span>
-                                  {data.score && <span className={styles.launchTileScore} style={{ color: data.status === "completed" ? "var(--white-loophole)" : "var(--black-loophole)" }}>{data.score}</span>}
-                                </div>
-                                {data.status === "in-progress" && <span className={styles.launchTileInProgressBadge}>●</span>}
-                                <div className={styles.launchTileActions}>
+                                <div className={styles.launchPtTileSeed} aria-hidden>🌱</div>
+                                <span className={styles.launchPtTileNum}>{pt}</span>
+                                <span className={styles.launchPtTileStatus}>{statusLabel}</span>
+                                <div className={styles.launchPtTileActions}>
                                   <button
-                                    className={styles.launchTileLaunch}
-                                    onClick={() => setScreen("test")}
-                                    title="Launch Now"
-                                  >▶</button>
-                                  <button
-                                    className={`${styles.launchTileAdd} ${inUpNext ? styles.launchTileAddActive : ""}`}
-                                    onClick={() => toggleUpNext(pt, sec)}
+                                    className={`${styles.launchPtTileAdd} ${inUpNext ? styles.launchPtTileAddActive : ""}`}
+                                    onClick={() => toggleUpNext(pt, "LR1")}
                                     title={inUpNext ? "Remove from Up Next" : "Add to Up Next"}
                                   >
                                     {inUpNext ? "✓" : "+"}
                                   </button>
+                                  <button
+                                    className={styles.launchPtTileLaunch}
+                                    onClick={() => setScreen("test")}
+                                    title="Launch Now"
+                                  >▶</button>
                                 </div>
                               </div>
                             );
                           })
-                      )}
+                        : group.pts.flatMap(pt =>
+                            (["LR1","LR2","RC","Exp"] as SectionType[])
+                              .filter(sec => filteredData.some(s => s.pt === pt && s.section === sec))
+                              .map(sec => {
+                                const data = PT_DATA.find(s => s.pt === pt && s.section === sec)!;
+                                const inUpNext = upNext.some(s => s.pt === pt && s.section === sec);
+                                return (
+                                  <div
+                                    key={`${pt}-${sec}`}
+                                    className={`${styles.launchTile} ${data.status === "completed" ? styles.launchTileCompleted : data.status === "in-progress" ? styles.launchTileInProgress : ""}`}
+                                  >
+                                    <div className={styles.launchTileBadge} style={{ background: data.status === "completed" ? "var(--turquoise-hc)" : data.status === "in-progress" ? "var(--mango)" : "#A6EDE9", borderColor: data.status !== "not-started" ? "var(--white-loophole)" : "var(--black-loophole)" }}>
+                                      <span className={styles.launchTileBadgeText} style={{ color: data.status !== "not-started" ? "#fff" : "var(--black-loophole)" }}>{pt}</span>
+                                    </div>
+                                    <div className={styles.launchTileBody}>
+                                      <span className={styles.launchTilePT}>PT {pt}</span>
+                                      <span
+                                        className={styles.launchTileSection}
+                                        style={{ color: data.status !== "not-started" ? "var(--white-loophole)" : SECTION_COLORS[sec] }}
+                                      >
+                                        {sec}
+                                      </span>
+                                      {data.score && <span className={styles.launchTileScore} style={{ color: data.status === "completed" ? "var(--white-loophole)" : "var(--black-loophole)" }}>{data.score}</span>}
+                                    </div>
+                                    {data.status === "in-progress" && <span className={styles.launchTileInProgressBadge}>●</span>}
+                                    <div className={styles.launchTileActions}>
+                                      <button
+                                        className={styles.launchTileLaunch}
+                                        onClick={() => setScreen("test")}
+                                        title="Launch Now"
+                                      >▶</button>
+                                      <button
+                                        className={`${styles.launchTileAdd} ${inUpNext ? styles.launchTileAddActive : ""}`}
+                                        onClick={() => toggleUpNext(pt, sec)}
+                                        title={inUpNext ? "Remove from Up Next" : "Add to Up Next"}
+                                      >
+                                        {inUpNext ? "✓" : "+"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                          )}
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Footer */}
+            <footer className={styles.launchFooter}>
+              <div className={styles.launchFooterRow}>
+                <div className={styles.launchFooterLeft}>
+                  <span className={styles.launchFooterDot} aria-hidden>◉</span>
+                  <a className={styles.launchFooterLink} href="#contact">Contact</a>
+                  <a className={styles.launchFooterLink} href="#terms">Terms of Service</a>
+                  <a className={styles.launchFooterLink} href="#privacy">Privacy Policy</a>
+                </div>
+                <span className={styles.launchFooterCopy}>Copyright © 2026 Elemental Prep. All rights reserved.</span>
+              </div>
+              <p className={styles.launchFooterDisclaimer}>
+                LSAT® is a trademark registered by LSAC, which is not affiliated with, and does not endorse, this site.
+              </p>
+            </footer>
           </div>
         </main>
       </div>
@@ -1288,15 +1414,29 @@ export default function TestTakingInterface() {
       { id: "RC", label: "Exp", locked: true },
     ];
 
+    const heroSubtitle = !camoCompleted
+      ? "You skipped Camo — view section results and launch Camo anytime."
+      : wrongCount === 0
+      ? "You aced this section — keep that momentum."
+      : camoBuckets["self-doubt"] > 0 && camoBuckets.misread === 0
+      ? "You second-guessed yourself in Camo — trust your instincts, my lamb."
+      : "Review how you did and sharpen your edges with Camo.";
+
     return (
       <div className={styles.reviewContainer}>
-        {/* Top bar */}
-        <header className={styles.reviewTopBar}>
-          <button className={styles.reviewBackBtn} onClick={() => setScreen("launch")}>
-            ← My Progress
-          </button>
-          <span className={styles.reviewBreadcrumb}>Review · PT 92 · LR Section 1</span>
-          <button className={styles.reviewMenuBtn} title="Options">⋮</button>
+        {/* Hero banner */}
+        <header className={styles.reviewHero}>
+          <div className={styles.reviewHeroTopRow}>
+            <button className={styles.reviewBackBtn} onClick={() => setScreen("launch")}>
+              ← Back to My Progress
+            </button>
+            <button className={styles.reviewMenuBtn} title="Options">⋮</button>
+          </div>
+          <div className={styles.reviewHeroTitleBlock}>
+            <span className={styles.reviewHeroEyebrow}>Section Review</span>
+            <h1 className={styles.reviewHeroTitle}>PT 92 — LR Section 1</h1>
+            <p className={styles.reviewHeroSubtitle}>{heroSubtitle}</p>
+          </div>
         </header>
 
         {/* Section tabs */}
@@ -1358,23 +1498,84 @@ export default function TestTakingInterface() {
               <h2 className={styles.reviewCardTitle}>Camo Summary</h2>
             </header>
             {!camoCompleted ? (
-              <p className={`${styles.camoImprovementMsg} ${styles.camoSkipped}`}>
-                Camo skipped — category data unavailable.
-              </p>
+              <div className={`${styles.camoCallout} ${styles.camoCalloutSkipped}`}>
+                <div className={styles.camoCalloutCol}>
+                  <span className={styles.camoCalloutLabel}>Camo skipped</span>
+                  <span className={styles.camoCalloutHeading}>Category data unavailable</span>
+                  <span className={styles.camoCalloutBody}>
+                    You skipped Camo, so we can&apos;t tell which wrong answers were misreads vs true gaps. Your section score reflects your original take.
+                  </span>
+                </div>
+                <button
+                  className={styles.camoCalloutCta}
+                  onClick={startCamo}
+                >
+                  Launch Camo Now
+                </button>
+              </div>
             ) : wrongCount === 0 ? (
-              <p className={styles.camoImprovementMsg}>Perfect section — no Camo needed!</p>
+              <div className={`${styles.camoCallout} ${styles.camoCalloutPerfect}`}>
+                <div className={styles.camoCalloutIcon}>✓</div>
+                <div className={styles.camoCalloutCol}>
+                  <span className={styles.camoCalloutHeading}>Perfect section — no Camo needed!</span>
+                  <span className={styles.camoCalloutBody}>
+                    You got all {totalQuestions} questions correct on your first try. Move to the next section and keep that streak going.
+                  </span>
+                </div>
+              </div>
+            ) : camoBuckets["self-doubt"] > 0 && camoBuckets.misread === 0 ? (
+              <div className={`${styles.camoCallout} ${styles.camoCalloutDecreased}`}>
+                <div className={styles.camoCalloutCol}>
+                  <span className={styles.camoCalloutLabel}>Decreased</span>
+                  <span className={styles.camoCalloutHeading}>{`−${camoBuckets["self-doubt"]} point${camoBuckets["self-doubt"] > 1 ? "s" : ""} in Camo`}</span>
+                  <span className={styles.camoCalloutBody}>
+                    You second-guessed yourself on {camoBuckets["self-doubt"]} question{camoBuckets["self-doubt"] > 1 ? "s" : ""} you had correct originally. Trust your instincts, my lamb.
+                  </span>
+                </div>
+                <div className={styles.camoCalloutCol}>
+                  <span className={styles.camoCalloutLabel}>What to do</span>
+                  <span className={styles.camoCalloutHeading}>Commit earlier</span>
+                  <span className={styles.camoCalloutBody}>
+                    When you see your original answer in Camo, lean into it unless you spot a concrete reason to switch.
+                  </span>
+                </div>
+              </div>
             ) : camoBuckets.misread > 0 ? (
-              <p className={styles.camoImprovementMsg}>
-                {`Nice! You picked up ${camoBuckets.misread} point${camoBuckets.misread > 1 ? "s" : ""} in Camo.`}
-              </p>
-            ) : camoBuckets["self-doubt"] > 0 ? (
-              <p className={`${styles.camoImprovementMsg} ${styles.camoDecreased}`}>
-                {`You second-guessed yourself on ${camoBuckets["self-doubt"]} question${camoBuckets["self-doubt"] > 1 ? "s" : ""} in Camo. Trust your instincts, my lamb.`}
-              </p>
+              <div className={styles.camoCallout}>
+                <div className={styles.camoCalloutCol}>
+                  <span className={styles.camoCalloutLabel}>What you did well</span>
+                  <span className={styles.camoCalloutHeading}>{`+${camoBuckets.misread} point${camoBuckets.misread > 1 ? "s" : ""} in Camo`}</span>
+                  <span className={styles.camoCalloutBody}>
+                    You caught {camoBuckets.misread} misread trap{camoBuckets.misread > 1 ? "s" : ""}. Slow down on comparative language — you re-read those stems correctly.
+                  </span>
+                </div>
+                {camoBuckets.conceptual > 0 && (
+                  <div className={styles.camoCalloutCol}>
+                    <span className={styles.camoCalloutLabel}>Where to focus next</span>
+                    <span className={styles.camoCalloutHeading}>{`${camoBuckets.conceptual} conceptual gap${camoBuckets.conceptual > 1 ? "s" : ""}`}</span>
+                    <span className={styles.camoCalloutBody}>
+                      Stuck after Camo? Review the underlying rule and return fresh.
+                    </span>
+                  </div>
+                )}
+              </div>
             ) : (
-              <p className={styles.camoImprovementMsg}>
-                Your Camo score stayed the same. Either these were tough questions or you rushed through Camo.
-              </p>
+              <div className={styles.camoCallout}>
+                <div className={styles.camoCalloutCol}>
+                  <span className={styles.camoCalloutLabel}>No movement</span>
+                  <span className={styles.camoCalloutHeading}>Score stayed the same</span>
+                  <span className={styles.camoCalloutBody}>
+                    Either these were tough questions or you rushed through Camo. Slow down on your next review and re-read each stem carefully.
+                  </span>
+                </div>
+                <div className={styles.camoCalloutCol}>
+                  <span className={styles.camoCalloutLabel}>Try next time</span>
+                  <span className={styles.camoCalloutHeading}>Translation Drill first</span>
+                  <span className={styles.camoCalloutBody}>
+                    Use Translation Drill on these question types to build conceptual fluency.
+                  </span>
+                </div>
+              </div>
             )}
             <div className={styles.camoBuckets}>
               <div className={styles.camoBucket}>
@@ -1472,71 +1673,107 @@ export default function TestTakingInterface() {
               </div>
             </header>
 
-            {/* Filter Bar */}
-            <div className={styles.filterBar}>
-              <span className={styles.filterLabel}>Filters</span>
+            {/* Filter Bar — dropdown pattern */}
+            {(() => {
+              const answerOrder = ["all", "correct", "wrong", "skipped"] as const;
+              const camoOrder = ["all", "conceptual", "misread", "self-doubt", "self-confidence"] as const;
+              const timingOrder = ["all", "time-sink", "near-pace", "time-saver"] as const;
+              const labelForTiming = (v: string) =>
+                v === "time-sink" ? "Time Sink" : v === "near-pace" ? "Near Pace" : v === "time-saver" ? "Time Saver" : "All";
+              function cycle<T extends readonly string[]>(order: T, curr: T[number]): T[number] {
+                const idx = order.indexOf(curr);
+                return order[(idx + 1) % order.length] as T[number];
+              }
+              const activeChips: Array<{ key: string; label: string; onRemove: () => void }> = [];
+              if (reviewFilters.answer !== "all") {
+                activeChips.push({
+                  key: "answer",
+                  label: reviewFilters.answer.charAt(0).toUpperCase() + reviewFilters.answer.slice(1),
+                  onRemove: () => setReviewFilters((f) => ({ ...f, answer: "all" })),
+                });
+              }
+              if (reviewFilters.camo !== "all") {
+                activeChips.push({
+                  key: "camo",
+                  label: labelForCamo(reviewFilters.camo),
+                  onRemove: () => setReviewFilters((f) => ({ ...f, camo: "all" })),
+                });
+              }
+              if (reviewFilters.flag === "flagged") {
+                activeChips.push({
+                  key: "flag",
+                  label: "Flagged",
+                  onRemove: () => setReviewFilters((f) => ({ ...f, flag: "all" })),
+                });
+              }
+              if (reviewFilters.timing !== "all") {
+                activeChips.push({
+                  key: "timing",
+                  label: labelForTiming(reviewFilters.timing),
+                  onRemove: () => setReviewFilters((f) => ({ ...f, timing: "all" })),
+                });
+              }
+              return (
+                <div className={styles.filterBar}>
+                  <div className={styles.filterPrimaryRow}>
+                    <button
+                      className={`${styles.filterDropdown} ${reviewFilters.answer !== "all" ? styles.filterDropdownActive : ""}`}
+                      onClick={() => setReviewFilters((f) => ({ ...f, answer: cycle(answerOrder, f.answer) }))}
+                    >
+                      {reviewFilters.answer === "all"
+                        ? "Answer"
+                        : `Answer: ${reviewFilters.answer.charAt(0).toUpperCase() + reviewFilters.answer.slice(1)}`}
+                      <span className={styles.filterDropdownCaret}>▾</span>
+                    </button>
+                    <button
+                      className={`${styles.filterDropdown} ${reviewFilters.camo !== "all" ? styles.filterDropdownActive : ""}`}
+                      onClick={() => setReviewFilters((f) => ({ ...f, camo: cycle(camoOrder, f.camo) }))}
+                    >
+                      {reviewFilters.camo === "all" ? "Camo Type" : `Camo: ${labelForCamo(reviewFilters.camo)}`}
+                      <span className={styles.filterDropdownCaret}>▾</span>
+                    </button>
+                    <button
+                      className={`${styles.filterDropdown} ${reviewFilters.flag === "flagged" ? styles.filterDropdownActive : ""}`}
+                      onClick={() =>
+                        setReviewFilters((f) => ({ ...f, flag: f.flag === "flagged" ? "all" : "flagged" }))
+                      }
+                    >
+                      {reviewFilters.flag === "flagged" ? "⚑ Flagged" : "Flag"}
+                      <span className={styles.filterDropdownCaret}>▾</span>
+                    </button>
+                    <button
+                      className={`${styles.filterDropdown} ${reviewFilters.timing !== "all" ? styles.filterDropdownActive : ""}`}
+                      onClick={() => setReviewFilters((f) => ({ ...f, timing: cycle(timingOrder, f.timing) }))}
+                    >
+                      {reviewFilters.timing === "all" ? "Timing" : `Timing: ${labelForTiming(reviewFilters.timing)}`}
+                      <span className={styles.filterDropdownCaret}>▾</span>
+                    </button>
+                    <span className={styles.filterCount}>
+                      Showing {filteredRows.length} of {reviewRows.length}
+                    </span>
+                  </div>
 
-              {/* Answer filter */}
-              {(["correct", "wrong", "skipped"] as const).map((val) => (
-                <button
-                  key={val}
-                  className={`${styles.filterChip} ${reviewFilters.answer === val ? styles.filterChipActive : ""}`}
-                  onClick={() => setReviewFilters((f) => ({ ...f, answer: f.answer === val ? "all" : val }))}
-                >
-                  {val.charAt(0).toUpperCase() + val.slice(1)}
-                  {reviewFilters.answer === val && <span className={styles.filterChipX}>×</span>}
-                </button>
-              ))}
-
-              <span className={styles.filterDivider} />
-
-              {/* Camo category filter */}
-              {(["conceptual", "misread", "self-doubt", "self-confidence"] as const).map((val) => (
-                <button
-                  key={val}
-                  className={`${styles.filterChip} ${reviewFilters.camo === val ? styles.filterChipActive : ""}`}
-                  style={reviewFilters.camo === val ? { background: camoColors[val], borderColor: camoColors[val], color: "#fff" } : {}}
-                  onClick={() => setReviewFilters((f) => ({ ...f, camo: f.camo === val ? "all" : val }))}
-                >
-                  {labelForCamo(val)}
-                  {reviewFilters.camo === val && <span className={styles.filterChipX}>×</span>}
-                </button>
-              ))}
-
-              <span className={styles.filterDivider} />
-
-              {/* Flag filter */}
-              <button
-                className={`${styles.filterChip} ${reviewFilters.flag === "flagged" ? styles.filterChipActive : ""}`}
-                onClick={() => setReviewFilters((f) => ({ ...f, flag: f.flag === "flagged" ? "all" : "flagged" }))}
-              >
-                ⚑ Flagged
-                {reviewFilters.flag === "flagged" && <span className={styles.filterChipX}>×</span>}
-              </button>
-
-              {/* Timing filter */}
-              {(["time-sink", "near-pace", "time-saver"] as const).map((val) => (
-                <button
-                  key={val}
-                  className={`${styles.filterChip} ${reviewFilters.timing === val ? styles.filterChipActive : ""}`}
-                  onClick={() => setReviewFilters((f) => ({ ...f, timing: f.timing === val ? "all" : val }))}
-                >
-                  {val === "time-sink" ? "Time Sink" : val === "near-pace" ? "Near Pace" : "Time Saver"}
-                  {reviewFilters.timing === val && <span className={styles.filterChipX}>×</span>}
-                </button>
-              ))}
-
-              {activeFilterCount > 0 && (
-                <button
-                  className={styles.filterReset}
-                  onClick={() => setReviewFilters({ answer: "all", camo: "all", flag: "all", timing: "all" })}
-                >
-                  Reset ({activeFilterCount})
-                </button>
-              )}
-
-              <span className={styles.filterCount}>{filteredRows.length} / {reviewRows.length}</span>
-            </div>
+                  {activeChips.length > 0 && (
+                    <div className={styles.filterSecondaryRow}>
+                      {activeChips.map((c) => (
+                        <button key={c.key} className={styles.filterActiveChip} onClick={c.onRemove}>
+                          {c.label}
+                          <span className={styles.filterActiveChipX}>×</span>
+                        </button>
+                      ))}
+                      <button
+                        className={styles.filterClearAll}
+                        onClick={() =>
+                          setReviewFilters({ answer: "all", camo: "all", flag: "all", timing: "all" })
+                        }
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <table className={styles.reviewTable}>
               <thead>
@@ -1547,6 +1784,7 @@ export default function TestTakingInterface() {
                   <th>Camo</th>
                   <th className={styles.tdRight}>Time</th>
                   <th className={styles.tdCenter}>WAJ</th>
+                  <th className={styles.tdChevron} aria-hidden></th>
                 </tr>
               </thead>
               <tbody>
@@ -1592,6 +1830,9 @@ export default function TestTakingInterface() {
                       ) : (
                         <span className={styles.tdMuted}>—</span>
                       )}
+                    </td>
+                    <td className={styles.tdChevron} aria-hidden>
+                      <span className={styles.tdChevronBtn}>›</span>
                     </td>
                   </tr>
                 ))}
@@ -1697,6 +1938,7 @@ export default function TestTakingInterface() {
 
   return (
     <div className={styles.container}>
+     <div className={styles.contentWrap}>
       {/* Header */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
@@ -1775,13 +2017,72 @@ export default function TestTakingInterface() {
           <button className={styles.toolBtn} title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("underline")}>U̲</button>
           <button className={styles.toolBtn} title="Eraser" onMouseDown={(e) => e.preventDefault()} onClick={eraseHighlight}>⌫</button>
           <span className={styles.toolbarDivider} />
-          <button className={styles.toolBtn} title="Text size">Aa</button>
-          <button className={styles.toolBtn} title="Line height">↕</button>
+          <div className={styles.toolBtnWrap}>
+            <button
+              className={`${styles.toolBtn} ${textSizeOpen ? styles.toolBtnActive : ""}`}
+              title="Text size"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setTextSizeOpen((o) => !o); setLineHeightOpen(false); }}
+            >Aa</button>
+            {textSizeOpen && (
+              <div className={styles.toolDropdown}>
+                <span className={styles.toolDropdownHeader}>Text size</span>
+                {(["small", "default", "large", "xlarge"] as const).map((v) => (
+                  <button
+                    key={v}
+                    className={`${styles.toolDropdownRow} ${textSize === v ? styles.toolDropdownRowActive : ""}`}
+                    onClick={() => { setPersistedTextSize(v); setTextSizeOpen(false); }}
+                  >
+                    <span className={styles.toolRadio} aria-hidden>
+                      {textSize === v && <span className={styles.toolRadioDot} />}
+                    </span>
+                    <span className={styles.toolDropdownLabel} style={{ fontSize: textSizePx[v] * 0.85 }}>
+                      {v === "xlarge" ? "Extra Large" : v.charAt(0).toUpperCase() + v.slice(1)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className={styles.toolBtnWrap}>
+            <button
+              className={`${styles.toolBtn} ${lineHeightOpen ? styles.toolBtnActive : ""}`}
+              title="Line height"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setLineHeightOpen((o) => !o); setTextSizeOpen(false); }}
+            >↕</button>
+            {lineHeightOpen && (
+              <div className={styles.toolDropdown}>
+                <span className={styles.toolDropdownHeader}>Line height</span>
+                {(["default", "medium", "large"] as const).map((v) => (
+                  <button
+                    key={v}
+                    className={`${styles.toolDropdownRow} ${lineHeight === v ? styles.toolDropdownRowActive : ""}`}
+                    onClick={() => { setPersistedLineHeight(v); setLineHeightOpen(false); }}
+                  >
+                    <span className={styles.toolRadio} aria-hidden>
+                      {lineHeight === v && <span className={styles.toolRadioDot} />}
+                    </span>
+                    <div className={styles.toolDropdownBody}>
+                      <span className={styles.toolDropdownLabel}>{v === "default" ? "Default" : v === "medium" ? "Medium" : "Large"}</span>
+                      <span className={styles.toolDropdownMeta}>{lineHeightNum[v]}×</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Main Split Panel */}
-      <main className={styles.main}>
+      <main
+        className={styles.main}
+        style={{
+          ["--reading-size" as string]: `${textSizePx[textSize]}px`,
+          ["--reading-lh" as string]: lineHeightNum[lineHeight],
+        } as CSSProperties}
+      >
         {/* Left Panel — Stimulus */}
         <div className={styles.leftPanel}>
           <div className={styles.stimulusContent}>
@@ -1884,23 +2185,23 @@ export default function TestTakingInterface() {
           </button>
         </div>
       </footer>
+     </div>
 
       {/* Pause Overlay */}
       {isPaused && (
-        <div className={styles.pauseOverlay}>
-          <div className={styles.pauseModal}>
-            <h2>Section Paused</h2>
-            <p className={styles.pauseInfo}>
-              {totalQuestions - Object.keys(selectedAnswers).length} unanswered questions remaining
+        <div className={styles.pauseOverlay} onClick={() => setIsPaused(false)}>
+          <div className={styles.pauseModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.pauseIconCircle} aria-hidden>▶</div>
+            <h2 className={styles.pauseTitle}>Paused</h2>
+            <p className={styles.pauseSubtitle}>
+              Timer is paused. Click Resume when you&apos;re ready.
+              <br />
+              <span className={styles.pauseNote}>
+                Note: you can&apos;t pause the real LSAT — this is for practice only.
+              </span>
             </p>
-            <p className={styles.pauseNote}>
-              Note: You cannot pause the real LSAT. Pausing is for practice only.
-            </p>
-            <button
-              className={styles.resumeBtn}
-              onClick={() => setIsPaused(false)}
-            >
-              Resume
+            <button className={styles.pauseResumeBtn} onClick={() => setIsPaused(false)}>
+              Resume Section
             </button>
           </div>
         </div>
