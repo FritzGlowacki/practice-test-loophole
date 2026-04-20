@@ -433,15 +433,49 @@ export default function TestTakingInterface() {
   const [launchViewLevel, setLaunchViewLevel] = useState<"section" | "pt">("pt");
   const [ptHistoryOpen, setPtHistoryOpen] = useState(false);
   const [reviewTab, setReviewTab] = useState<"PT" | "S1" | "S2" | "S3" | "RC">("S1");
-  const [reviewSort, setReviewSort] = useState<"order" | "wrong" | "camo">("order");
+  const [reviewSort, setReviewSort] = useState<
+    "order" | "reverse" | "wrong" | "correct" | "camo" | "slowest" | "fastest" | "in-waj" | "need-waj"
+  >("order");
   const [reviewFilters, setReviewFilters] = useState<{
     answer: "all" | "correct" | "wrong" | "skipped";
     camo: "all" | "conceptual" | "misread" | "self-doubt" | "self-confidence";
     flag: "all" | "flagged";
-    timing: "all" | "time-sink" | "near-pace" | "time-saver";
+    timing:
+      | "all"
+      | "major-sink"
+      | "minor-sink"
+      | "near-pace"
+      | "time-saver"
+      | "skipped-guess"
+      | "above-pace"
+      | "below-pace";
   }>({ answer: "all", camo: "all", flag: "all", timing: "all" });
-  const [wajEntries, setWajEntries] = useState<Set<number>>(new Set());
+  const [reviewTagFilter, setReviewTagFilter] = useState<string | null>(null);
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  type WajEntry = { whyMissed: string; whatDifferently: string; processed: boolean };
+  const [wajEntries, setWajEntries] = useState<Record<number, WajEntry>>({});
+  const isInWaj = useCallback((id: number) => wajEntries[id]?.processed === true, [wajEntries]);
+  const [wajOpenQId, setWajOpenQId] = useState<number | null>(null);
+  const [wajDraft, setWajDraft] = useState<{ whyMissed: string; whatDifferently: string; editing: boolean }>({ whyMissed: "", whatDifferently: "", editing: false });
   const [detailQId, setDetailQId] = useState<number | null>(null);
+  const [detailTab, setDetailTab] = useState<"question" | "history">("question");
+  const [clirVisible, setClirVisible] = useState(false);
+  const [zoneExplorerQId, setZoneExplorerQId] = useState<number | null>(null);
+  const [zoneExplorerMode, setZoneExplorerMode] = useState<"original" | "camo">("original");
+  const [zoneExplorerTime, setZoneExplorerTime] = useState(0);
+  const [videoExplanationQId, setVideoExplanationQId] = useState<number | null>(null);
+  const [reviewMenuOpen, setReviewMenuOpen] = useState(false);
+  const [excludeFromAnalytics, setExcludeFromAnalytics] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<"section" | "pt" | null>(null);
+  const [tableHeaderSort, setTableHeaderSort] = useState<"" | "num-asc" | "num-desc" | "time-asc" | "time-desc" | "date-asc" | "date-desc">("");
+  const [reviewSearch, setReviewSearch] = useState("");
+  const [wajStatusFilter, setWajStatusFilter] = useState<"all" | "in-waj" | "need-waj">("all");
+  const [qTypeFilter, setQTypeFilter] = useState<string[]>([]);
+  const [labelFilter, setLabelFilter] = useState<string[]>([]);
+  const [qTypeOpen, setQTypeOpen] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
+  const [labelSearch, setLabelSearch] = useState("");
+  const [sectionFilter, setSectionFilter] = useState<"all" | "S1" | "S2" | "S3" | "Exp">("all");
   const [camoAnswers, setCamoAnswers] = useState<Record<number, string>>({});
   const [camoQuestions, setCamoQuestions] = useState<number[]>([]);
   const [textSize, setTextSize] = useState<"small" | "default" | "large" | "xlarge">("default");
@@ -698,6 +732,19 @@ export default function TestTakingInterface() {
 
   // ===== Review data (real answers + real camo if completed, mock timing) =====
   type CamoCategory = "correct" | "conceptual" | "misread" | "self-doubt" | "self-confidence" | "skipped";
+  const mockTagPools: string[][] = [
+    ["Assumption", "Necessary"],
+    ["Flaw", "Gap"],
+    ["Strengthen"],
+    ["Principle", "Apply"],
+    ["Weaken"],
+    ["Parallel"],
+    ["Inference"],
+    ["Method"],
+    ["Conclusion"],
+    ["Cause-Effect"],
+  ];
+  const sectionDate = "04/20/26";
   const reviewRows = QUESTIONS.map((q, i) => {
     const userAnswer = selectedAnswers[q.id];
     const isCorrect = userAnswer === q.correctAnswer;
@@ -708,6 +755,7 @@ export default function TestTakingInterface() {
     const time = mockTimings[i % mockTimings.length];
     const targetTime = 90;
     const delta = time - targetTime;
+    const tags = mockTagPools[i % mockTagPools.length];
 
     let camo: CamoCategory = "correct";
     if (camoCompleted && isInCamo && camoAnswer) {
@@ -729,6 +777,17 @@ export default function TestTakingInterface() {
       } else if (wasFlagged) camo = "self-confidence";
     }
 
+    // Mock zone breakdown per question — stimulus, stem, A-E, with proportional durations
+    const zonePattern = [
+      { zone: "Stimulus", pct: 0.38 },
+      { zone: "Stem", pct: 0.10 },
+      { zone: "A", pct: 0.06 },
+      { zone: "B", pct: 0.18 },
+      { zone: "C", pct: 0.08 },
+      { zone: "D", pct: 0.12 },
+      { zone: "E", pct: 0.08 },
+    ];
+    const zones = zonePattern.map((z) => ({ zone: z.zone, duration: Math.round(time * z.pct) }));
     return {
       id: q.id,
       citation: `PT92.S2.Q${q.id}`,
@@ -742,6 +801,12 @@ export default function TestTakingInterface() {
       delta,
       camo,
       repeatWrong: !isCorrect && i % 3 === 0,
+      repeatDaysAgo: (i % 3 === 0 && !isCorrect) ? 14 + (i % 40) : null,
+      tags,
+      date: sectionDate,
+      zones,
+      startedAt: `${Math.floor((i * 2) / 60)}:${((i * 2) % 60).toString().padStart(2, "0")}`,
+      returnedAt: i % 5 === 0 ? `${Math.floor((i * 2 + 15) / 60)}:${((i * 2 + 15) % 60).toString().padStart(2, "0")}` : null,
     };
   });
 
@@ -771,21 +836,54 @@ export default function TestTakingInterface() {
   const camoOrder: Record<string, number> = { conceptual: 0, "self-doubt": 1, misread: 2, "self-confidence": 3, skipped: 4, correct: 5 };
   const sortedRows = (() => {
     const base = [...reviewRows];
-    if (reviewSort === "wrong") base.sort((a, b) => Number(b.repeatWrong) - Number(a.repeatWrong) || Number(!a.isCorrect) - Number(!b.isCorrect));
+    if (reviewSort === "reverse") base.sort((a, b) => b.id - a.id);
+    else if (reviewSort === "wrong") base.sort((a, b) => Number(b.repeatWrong) - Number(a.repeatWrong) || Number(!a.isCorrect) - Number(!b.isCorrect));
+    else if (reviewSort === "correct") base.sort((a, b) => Number(b.isCorrect) - Number(a.isCorrect));
     else if (reviewSort === "camo") base.sort((a, b) => (camoOrder[a.camo] ?? 9) - (camoOrder[b.camo] ?? 9));
+    else if (reviewSort === "slowest") base.sort((a, b) => b.time - a.time);
+    else if (reviewSort === "fastest") base.sort((a, b) => a.time - b.time);
+    else if (reviewSort === "in-waj") base.sort((a, b) => Number(isInWaj(b.id)) - Number(isInWaj(a.id)));
+    else if (reviewSort === "need-waj") base.sort((a, b) =>
+      Number((!b.isCorrect && b.userAnswer !== "—" && !isInWaj(b.id))) -
+      Number((!a.isCorrect && a.userAnswer !== "—" && !isInWaj(a.id)))
+    );
     return base;
   })();
 
+  const paceRatio = (delta: number, target: number) => (target + delta) / target;
   const filteredRows = sortedRows.filter((r) => {
     if (reviewFilters.answer === "correct" && !r.isCorrect) return false;
     if (reviewFilters.answer === "wrong" && (r.isCorrect || r.userAnswer === "—")) return false;
     if (reviewFilters.answer === "skipped" && r.userAnswer !== "—") return false;
     if (reviewFilters.camo !== "all" && r.camo !== reviewFilters.camo) return false;
     if (reviewFilters.flag === "flagged" && !r.wasFlagged) return false;
-    if (reviewFilters.timing === "time-sink" && r.delta <= 20) return false;
-    if (reviewFilters.timing === "near-pace" && (r.delta < -15 || r.delta > 20)) return false;
-    if (reviewFilters.timing === "time-saver" && r.delta >= -15) return false;
+    const ratio = paceRatio(r.delta, 90);
+    if (reviewFilters.timing === "major-sink" && ratio < 2) return false;
+    if (reviewFilters.timing === "minor-sink" && (ratio < 1.25 || ratio >= 2)) return false;
+    if (reviewFilters.timing === "near-pace" && (ratio < 0.9 || ratio > 1.25)) return false;
+    if (reviewFilters.timing === "time-saver" && (ratio >= 0.9 || r.time <= 15)) return false;
+    if (reviewFilters.timing === "skipped-guess" && r.time > 15) return false;
+    if (reviewFilters.timing === "above-pace" && ratio <= 1) return false;
+    if (reviewFilters.timing === "below-pace" && ratio >= 1) return false;
+    if (reviewTagFilter && !r.tags.includes(reviewTagFilter)) return false;
+    if (wajStatusFilter === "in-waj" && !isInWaj(r.id)) return false;
+    if (wajStatusFilter === "need-waj" && (r.isCorrect || r.userAnswer === "—" || isInWaj(r.id))) return false;
+    if (reviewSearch.trim()) {
+      const q = reviewSearch.trim().toLowerCase();
+      const haystack = `${r.citation} ${r.tags.join(" ")} Q${r.id}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
     return true;
+  })
+  // Column header sorting overrides primary sort
+  .sort((a, b) => {
+    if (tableHeaderSort === "num-asc") return a.id - b.id;
+    if (tableHeaderSort === "num-desc") return b.id - a.id;
+    if (tableHeaderSort === "time-asc") return a.time - b.time;
+    if (tableHeaderSort === "time-desc") return b.time - a.time;
+    if (tableHeaderSort === "date-asc") return a.date.localeCompare(b.date);
+    if (tableHeaderSort === "date-desc") return b.date.localeCompare(a.date);
+    return 0;
   });
 
   const activeFilterCount = Object.values(reviewFilters).filter((v) => v !== "all").length;
@@ -1410,8 +1508,8 @@ export default function TestTakingInterface() {
       { id: "PT", label: "PT 92" },
       { id: "S1", label: "S1 · LR" },
       { id: "S2", label: "S2 · LR" },
-      { id: "S3", label: "S3 · RC", locked: true },
-      { id: "RC", label: "Exp", locked: true },
+      { id: "S3", label: "S3 · RC" },
+      { id: "RC", label: "Exp" },
     ];
 
     const heroSubtitle = !camoCompleted
@@ -1430,32 +1528,145 @@ export default function TestTakingInterface() {
             <button className={styles.reviewBackBtn} onClick={() => setScreen("launch")}>
               ← Back to My Progress
             </button>
-            <button className={styles.reviewMenuBtn} title="Options">⋮</button>
+            <div className={styles.reviewMenuWrap}>
+              <button
+                className={styles.reviewMenuBtn}
+                title="Options"
+                onClick={() => setReviewMenuOpen((o) => !o)}
+              >⋮</button>
+              {reviewMenuOpen && (
+                <div className={styles.reviewMenuDropdown}>
+                  <label className={styles.reviewMenuToggle}>
+                    <input
+                      type="checkbox"
+                      checked={excludeFromAnalytics}
+                      onChange={(e) => setExcludeFromAnalytics(e.target.checked)}
+                    />
+                    <span>Exclude from Analytics</span>
+                  </label>
+                  <div className={styles.reviewMenuDivider} />
+                  <button
+                    className={styles.reviewMenuDelBtn}
+                    onClick={() => { setDeleteModal("section"); setReviewMenuOpen(false); }}
+                  >Delete this section</button>
+                  <button
+                    className={styles.reviewMenuDelBtn}
+                    onClick={() => { setDeleteModal("pt"); setReviewMenuOpen(false); }}
+                  >Delete this PT attempt</button>
+                </div>
+              )}
+            </div>
           </div>
           <div className={styles.reviewHeroTitleBlock}>
             <span className={styles.reviewHeroEyebrow}>Section Review</span>
             <h1 className={styles.reviewHeroTitle}>PT 92 — LR Section 1</h1>
             <p className={styles.reviewHeroSubtitle}>{heroSubtitle}</p>
           </div>
+          <div className={styles.reviewActions}>
+            <button className={styles.reviewActionBtn} onClick={() => setScreen("test")}>
+              <span className={styles.reviewActionIcon} aria-hidden>◉</span>
+              <span>View Take</span>
+            </button>
+            <button className={styles.reviewActionBtn} onClick={() => setScreen("test")}>
+              <span className={styles.reviewActionIcon} aria-hidden>↩</span>
+              <span>Jump Back In</span>
+            </button>
+            <button className={styles.reviewActionBtn} onClick={() => setScreen("test")}>
+              <span className={styles.reviewActionIcon} aria-hidden>↻</span>
+              <span>Fresh Take</span>
+            </button>
+          </div>
         </header>
 
         {/* Section tabs */}
         <nav className={styles.reviewTabs}>
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              className={`${styles.reviewTab} ${reviewTab === t.id ? styles.reviewTabActive : ""} ${t.locked ? styles.reviewTabLocked : ""}`}
-              onClick={() => !t.locked && setReviewTab(t.id)}
-              disabled={t.locked}
-              title={t.locked ? "Complete this section to unlock" : undefined}
-            >
-              {t.label}
-              {t.locked && <span className={styles.reviewTabLock}>🔒</span>}
-            </button>
-          ))}
+          {tabs.map((t) => {
+            const lockedSectionsRemaining = tabs.filter((x) => x.locked).length;
+            const tabTitle = t.locked
+              ? t.id === "PT"
+                ? `Complete ${lockedSectionsRemaining} remaining section${lockedSectionsRemaining > 1 ? "s" : ""} to unlock PT Review`
+                : "Complete this section to unlock"
+              : undefined;
+            return (
+              <button
+                key={t.id}
+                className={`${styles.reviewTab} ${reviewTab === t.id ? styles.reviewTabActive : ""} ${t.locked ? styles.reviewTabLocked : ""}`}
+                onClick={() => !t.locked && setReviewTab(t.id)}
+                disabled={t.locked}
+                title={tabTitle}
+              >
+                {t.label}
+                {t.locked && <span className={styles.reviewTabLock}>🔒</span>}
+              </button>
+            );
+          })}
         </nav>
 
+        {/* Section Metadata row */}
+        <div className={styles.reviewMeta}>
+          <div className={styles.reviewMetaItem}>
+            <span className={styles.reviewMetaLabel}>Questions</span>
+            <span className={styles.reviewMetaValue}>{totalQuestions}</span>
+          </div>
+          <div className={styles.reviewMetaItem}>
+            <span className={styles.reviewMetaLabel}>Timing</span>
+            <span className={styles.reviewMetaValue}>Countdown · 35 min</span>
+          </div>
+          <div className={styles.reviewMetaItem}>
+            <span className={styles.reviewMetaLabel}>Time Used</span>
+            <span className={styles.reviewMetaValue}>{elapsedDisplay}</span>
+          </div>
+          <div className={styles.reviewMetaItem}>
+            <span className={styles.reviewMetaLabel}>Timer</span>
+            <span className={styles.reviewMetaValue}>{timerVisible ? "Visible" : "Hidden"}</span>
+          </div>
+          <div className={styles.reviewMetaItem}>
+            <span className={styles.reviewMetaLabel}>Take</span>
+            <span className={styles.reviewMetaValue}>1st</span>
+          </div>
+          {reviewTab === "RC" && (
+            <span className={styles.reviewMetaBadge}>Experimental</span>
+          )}
+        </div>
+
+        {/* Experimental info box */}
+        {reviewTab === "RC" && (
+          <div className={styles.reviewExperimentalInfo}>
+            <span className={styles.reviewExperimentalIcon} aria-hidden>⚠️</span>
+            <span>
+              This section was experimental on the actual LSAT — your performance here is informational and
+              does not affect your section or PT scored score.
+            </span>
+          </div>
+        )}
+
         <main className={styles.reviewMain}>
+          {reviewTab === "PT" && (
+            <section className={styles.ptAggregate}>
+              <div className={styles.ptAggregateCard}>
+                <span className={styles.reviewScoreLabel}>PT Scaled</span>
+                <span className={styles.reviewScoreValue}>163</span>
+                <span className={styles.reviewScoreSub}>Aggregate · all scored sections</span>
+              </div>
+              <div className={styles.reviewScoreDivider} />
+              <div className={styles.ptAggregateSections}>
+                {([
+                  { id: "S1", label: "S1 · LR", score: 169, wrong: 4 },
+                  { id: "S2", label: "S2 · LR", score: 158, wrong: 7 },
+                  { id: "S3", label: "S3 · RC", score: 161, wrong: 6 },
+                  { id: "Exp", label: "Exp (unscored)", score: null, wrong: 5 },
+                ] as const).map((s) => (
+                  <div key={s.id} className={styles.ptAggregateItem}>
+                    <span className={styles.ptAggregateItemLabel}>{s.label}</span>
+                    <span className={styles.ptAggregateItemScore}>
+                      {s.score ?? "—"}
+                    </span>
+                    <span className={styles.ptAggregateItemSub}>{s.wrong} wrong</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           {/* Score Card */}
           <section className={styles.reviewScoreCard}>
             <div className={styles.reviewScoreLeft}>
@@ -1666,10 +1877,47 @@ export default function TestTakingInterface() {
           <section className={styles.reviewCard}>
             <header className={styles.reviewCardHeader}>
               <h2 className={styles.reviewCardTitle}>Question Review</h2>
-              <div className={styles.reviewSortControls}>
-                <button className={`${styles.reviewSortBtn} ${reviewSort === "order" ? styles.reviewSortActive : ""}`} onClick={() => setReviewSort("order")}>Order</button>
-                <button className={`${styles.reviewSortBtn} ${reviewSort === "wrong" ? styles.reviewSortActive : ""}`} onClick={() => setReviewSort("wrong")}>Wrong first</button>
-                <button className={`${styles.reviewSortBtn} ${reviewSort === "camo" ? styles.reviewSortActive : ""}`} onClick={() => setReviewSort("camo")}>Camo order</button>
+              <div className={styles.reviewSortWrap}>
+                <button
+                  className={styles.reviewSortDropdownBtn}
+                  onClick={() => setSortMenuOpen((o) => !o)}
+                >
+                  Sort: {
+                    reviewSort === "order" ? "Order" :
+                    reviewSort === "reverse" ? "Reverse order" :
+                    reviewSort === "wrong" ? "Incorrect first" :
+                    reviewSort === "correct" ? "Correct first" :
+                    reviewSort === "camo" ? "Camo order" :
+                    reviewSort === "slowest" ? "Slowest first" :
+                    reviewSort === "fastest" ? "Fastest first" :
+                    reviewSort === "in-waj" ? "In WAJ first" :
+                    "Need to WAJ"
+                  }
+                  <span className={styles.reviewSortCaret} aria-hidden>▾</span>
+                </button>
+                {sortMenuOpen && (
+                  <div className={styles.reviewSortMenu}>
+                    {([
+                      ["order", "Order"],
+                      ["reverse", "Reverse order"],
+                      ["wrong", "Incorrect first"],
+                      ["correct", "Correct first"],
+                      ["camo", "Camo order"],
+                      ["slowest", "Slowest first"],
+                      ["fastest", "Fastest first"],
+                      ["in-waj", "In WAJ first"],
+                      ["need-waj", "Need to WAJ"],
+                    ] as const).map(([val, label]) => (
+                      <button
+                        key={val}
+                        className={`${styles.reviewSortOption} ${reviewSort === val ? styles.reviewSortOptionActive : ""}`}
+                        onClick={() => { setReviewSort(val); setSortMenuOpen(false); }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </header>
 
@@ -1677,9 +1925,25 @@ export default function TestTakingInterface() {
             {(() => {
               const answerOrder = ["all", "correct", "wrong", "skipped"] as const;
               const camoOrder = ["all", "conceptual", "misread", "self-doubt", "self-confidence"] as const;
-              const timingOrder = ["all", "time-sink", "near-pace", "time-saver"] as const;
+              const timingOrder = [
+                "all",
+                "major-sink",
+                "minor-sink",
+                "near-pace",
+                "time-saver",
+                "skipped-guess",
+                "above-pace",
+                "below-pace",
+              ] as const;
               const labelForTiming = (v: string) =>
-                v === "time-sink" ? "Time Sink" : v === "near-pace" ? "Near Pace" : v === "time-saver" ? "Time Saver" : "All";
+                v === "major-sink" ? "Major Time Sink" :
+                v === "minor-sink" ? "Minor Time Sink" :
+                v === "near-pace" ? "Near Pace" :
+                v === "time-saver" ? "Time Saver" :
+                v === "skipped-guess" ? "Skipped (guess)" :
+                v === "above-pace" ? "Above Pace" :
+                v === "below-pace" ? "Below Pace" :
+                "All";
               function cycle<T extends readonly string[]>(order: T, curr: T[number]): T[number] {
                 const idx = order.indexOf(curr);
                 return order[(idx + 1) % order.length] as T[number];
@@ -1711,6 +1975,13 @@ export default function TestTakingInterface() {
                   key: "timing",
                   label: labelForTiming(reviewFilters.timing),
                   onRemove: () => setReviewFilters((f) => ({ ...f, timing: "all" })),
+                });
+              }
+              if (reviewTagFilter) {
+                activeChips.push({
+                  key: `tag-${reviewTagFilter}`,
+                  label: reviewTagFilter,
+                  onRemove: () => setReviewTagFilter(null),
                 });
               }
               return (
@@ -1748,6 +2019,114 @@ export default function TestTakingInterface() {
                       {reviewFilters.timing === "all" ? "Timing" : `Timing: ${labelForTiming(reviewFilters.timing)}`}
                       <span className={styles.filterDropdownCaret}>▾</span>
                     </button>
+                    <button
+                      className={`${styles.filterDropdown} ${wajStatusFilter !== "all" ? styles.filterDropdownActive : ""}`}
+                      onClick={() => {
+                        const order = ["all", "need-waj", "in-waj"] as const;
+                        const idx = order.indexOf(wajStatusFilter);
+                        setWajStatusFilter(order[(idx + 1) % order.length]);
+                      }}
+                    >
+                      {wajStatusFilter === "all" ? "WAJ"
+                        : wajStatusFilter === "need-waj" ? "WAJ: Need to WAJ"
+                        : "WAJ: In WAJ"}
+                      <span className={styles.filterDropdownCaret}>▾</span>
+                    </button>
+                    {/* Q-Type multi-select dropdown */}
+                    <div className={styles.filterMultiWrap}>
+                      <button
+                        className={`${styles.filterDropdown} ${qTypeFilter.length > 0 ? styles.filterDropdownActive : ""}`}
+                        onClick={() => { setQTypeOpen((o) => !o); setLabelOpen(false); }}
+                      >
+                        {qTypeFilter.length === 0 ? "Q-Type" : `Q-Type: ${qTypeFilter.length}`}
+                        <span className={styles.filterDropdownCaret}>▾</span>
+                      </button>
+                      {qTypeOpen && (
+                        <div className={styles.filterMultiMenu}>
+                          <span className={styles.filterMultiLabel}>Question type</span>
+                          {["Assumption (Necessary)", "Assumption (Sufficient)", "Flaw", "Strengthen", "Weaken", "Principle (Apply)", "Principle (Identify)", "Parallel", "Method", "Inference", "Main Point"].map((qt) => (
+                            <label key={qt} className={styles.filterMultiOption}>
+                              <input
+                                type="checkbox"
+                                checked={qTypeFilter.includes(qt)}
+                                onChange={(e) => setQTypeFilter((prev) =>
+                                  e.target.checked ? [...prev, qt] : prev.filter((x) => x !== qt)
+                                )}
+                              />
+                              <span>{qt}</span>
+                            </label>
+                          ))}
+                          <button
+                            className={styles.filterMultiClear}
+                            onClick={() => setQTypeFilter([])}
+                          >Clear</button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Labels searchable multi-select */}
+                    <div className={styles.filterMultiWrap}>
+                      <button
+                        className={`${styles.filterDropdown} ${labelFilter.length > 0 ? styles.filterDropdownActive : ""}`}
+                        onClick={() => { setLabelOpen((o) => !o); setQTypeOpen(false); }}
+                      >
+                        {labelFilter.length === 0 ? "Labels" : `Labels: ${labelFilter.length}`}
+                        <span className={styles.filterDropdownCaret}>▾</span>
+                      </button>
+                      {labelOpen && (
+                        <div className={styles.filterMultiMenu}>
+                          <span className={styles.filterMultiLabel}>Labels</span>
+                          <input
+                            type="search"
+                            className={styles.filterMultiSearch}
+                            placeholder="Search labels…"
+                            value={labelSearch}
+                            onChange={(e) => setLabelSearch(e.target.value)}
+                          />
+                          {["Necessary", "Sufficient", "Causal", "Conditional", "Comparative", "Quantifier", "Passage Science", "Passage Humanities", "Passage Law", "Stem reattempt", "New rule this take", "Vocab-heavy"]
+                            .filter((l) => !labelSearch.trim() || l.toLowerCase().includes(labelSearch.toLowerCase()))
+                            .map((label) => (
+                              <label key={label} className={styles.filterMultiOption}>
+                                <input
+                                  type="checkbox"
+                                  checked={labelFilter.includes(label)}
+                                  onChange={(e) => setLabelFilter((prev) =>
+                                    e.target.checked ? [...prev, label] : prev.filter((x) => x !== label)
+                                  )}
+                                />
+                                <span>{label}</span>
+                              </label>
+                            ))}
+                          <button
+                            className={styles.filterMultiClear}
+                            onClick={() => { setLabelFilter([]); setLabelSearch(""); }}
+                          >Clear</button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Section filter — only for PT Review tab */}
+                    {reviewTab === "PT" && (
+                      <button
+                        className={`${styles.filterDropdown} ${sectionFilter !== "all" ? styles.filterDropdownActive : ""}`}
+                        onClick={() => {
+                          const order = ["all", "S1", "S2", "S3", "Exp"] as const;
+                          const idx = order.indexOf(sectionFilter);
+                          setSectionFilter(order[(idx + 1) % order.length]);
+                        }}
+                      >
+                        {sectionFilter === "all" ? "Section" : `Section: ${sectionFilter}`}
+                        <span className={styles.filterDropdownCaret}>▾</span>
+                      </button>
+                    )}
+                    <div className={styles.filterSearch}>
+                      <span className={styles.filterSearchIcon} aria-hidden>⌕</span>
+                      <input
+                        type="search"
+                        value={reviewSearch}
+                        onChange={(e) => setReviewSearch(e.target.value)}
+                        placeholder="Search"
+                        className={styles.filterSearchInput}
+                      />
+                    </div>
                     <span className={styles.filterCount}>
                       Showing {filteredRows.length} of {reviewRows.length}
                     </span>
@@ -1763,9 +2142,10 @@ export default function TestTakingInterface() {
                       ))}
                       <button
                         className={styles.filterClearAll}
-                        onClick={() =>
-                          setReviewFilters({ answer: "all", camo: "all", flag: "all", timing: "all" })
-                        }
+                        onClick={() => {
+                          setReviewFilters({ answer: "all", camo: "all", flag: "all", timing: "all" });
+                          setReviewTagFilter(null);
+                        }}
                       >
                         Clear all
                       </button>
@@ -1778,23 +2158,182 @@ export default function TestTakingInterface() {
             <table className={styles.reviewTable}>
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th
+                    className={styles.thSortable}
+                    onClick={() => setTableHeaderSort((s) => s === "num-asc" ? "num-desc" : "num-asc")}
+                  >
+                    # {tableHeaderSort === "num-asc" ? "↑" : tableHeaderSort === "num-desc" ? "↓" : ""}
+                  </th>
                   <th>Question</th>
+                  <th
+                    className={styles.thSortable}
+                    onClick={() => setTableHeaderSort((s) => s === "date-asc" ? "date-desc" : "date-asc")}
+                  >
+                    Date {tableHeaderSort === "date-asc" ? "↑" : tableHeaderSort === "date-desc" ? "↓" : ""}
+                  </th>
                   <th>Section</th>
                   <th>Camo</th>
-                  <th className={styles.tdRight}>Time</th>
+                  <th
+                    className={`${styles.tdRight} ${styles.thSortable}`}
+                    onClick={() => setTableHeaderSort((s) => s === "time-asc" ? "time-desc" : "time-asc")}
+                  >
+                    Time {tableHeaderSort === "time-asc" ? "↑" : tableHeaderSort === "time-desc" ? "↓" : ""}
+                  </th>
                   <th className={styles.tdCenter}>WAJ</th>
                   <th className={styles.tdChevron} aria-hidden></th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((r) => (
+                {reviewTab === "S3" && (() => {
+                  // Mock RC passages grouping — 4 passages with 5-7 questions each
+                  const passages = [
+                    { id: 1, topic: "Archaeology", tags: ["Humanities"], questionCount: 6, readingTime: 285, combinedDelta: -8 },
+                    { id: 2, topic: "Antitrust law", tags: ["Law"], questionCount: 7, readingTime: 320, combinedDelta: 18 },
+                    { id: 3, topic: "Dark matter", tags: ["Science", "Physics"], questionCount: 6, readingTime: 310, combinedDelta: 32 },
+                    { id: 4, topic: "Comparative passages · jazz theory", tags: ["Humanities", "Comparative"], questionCount: 8, readingTime: 348, combinedDelta: -12 },
+                  ];
+                  let q = 0;
+                  return passages.flatMap((p) => {
+                    const rows = filteredRows.slice(q, q + Math.min(p.questionCount, filteredRows.length - q));
+                    q += p.questionCount;
+                    if (rows.length === 0) return [];
+                    const paceTarget = 240; // 4:00 baseline passage reading
+                    const ratio = (paceTarget + p.combinedDelta) / paceTarget;
+                    return [
+                      <tr key={`passage-${p.id}`} className={styles.passageRow}>
+                        <td colSpan={8}>
+                          <div
+                            className={styles.passageRowInner}
+                            title={`Reading: ${Math.round(p.readingTime * 0.35)}s · Questions: ${Math.round(p.readingTime * 0.65)}s · Paragraph breakdown on hover`}
+                          >
+                            <span className={styles.passageLabel}>Passage {p.id}</span>
+                            <span className={styles.passageTopic}>{p.topic}</span>
+                            <div className={styles.passageTags}>
+                              {p.tags.map((t) => (
+                                <span key={t} className={styles.passageTag}>{t}</span>
+                              ))}
+                            </div>
+                            <span className={styles.passageMeta}>{p.questionCount} questions</span>
+                            <span className={styles.passageTime}>
+                              {Math.floor(p.readingTime / 60)}:{(p.readingTime % 60).toString().padStart(2, "0")}
+                              <span
+                                className={styles.passageDelta}
+                                style={{
+                                  color: p.combinedDelta < 0 ? "var(--turquoise-hc)" : p.combinedDelta > 0 ? "var(--perform)" : "var(--text-muted)",
+                                }}
+                              >
+                                {p.combinedDelta >= 0 ? `+${p.combinedDelta}` : p.combinedDelta}s
+                              </span>
+                            </span>
+                          </div>
+                        </td>
+                      </tr>,
+                      ...rows.map((r) => (
+                        <tr key={r.id} className={styles.reviewTableRow} onClick={() => setDetailQId(r.id)}>
+                          <td className={styles.tdQNum}>
+                            {r.id}
+                            {r.repeatWrong && (
+                              <span
+                                className={styles.repeatBadge}
+                                title={`You also missed this question ${r.repeatDaysAgo} days ago.`}
+                              >⚠</span>
+                            )}
+                          </td>
+                          <td className={styles.tdCitation}>
+                            <div className={styles.tdCitationLine}>
+                              <span>{r.citation}</span>
+                              <span className={styles.tdCitationIcons} onClick={(e) => e.stopPropagation()}>
+                                <button className={styles.tdCitationIconBtn} title="Open question detail" onClick={() => setDetailQId(r.id)}>ⓘ</button>
+                                <button className={styles.tdCitationIconBtn} title="Open in full PT context" onClick={() => setDetailQId(r.id)}>↗</button>
+                              </span>
+                            </div>
+                            <div className={styles.tdTagPills}>
+                              {r.tags.map((tag) => (
+                                <button
+                                  key={tag}
+                                  className={`${styles.tdTagPill} ${reviewTagFilter === tag ? styles.tdTagPillActive : ""}`}
+                                  onClick={(e) => { e.stopPropagation(); setReviewTagFilter((prev) => (prev === tag ? null : tag)); }}
+                                >{tag}</button>
+                              ))}
+                            </div>
+                          </td>
+                          <td className={styles.tdDate}>{r.date}</td>
+                          <td>
+                            <AnswerCircle letter={r.userAnswer} color={r.userAnswer === "—" ? "var(--pewter)" : r.isCorrect ? "var(--turquoise)" : "var(--perform)"} />
+                          </td>
+                          <td>
+                            {!r.isInCamo || !r.camoAnswer ? (
+                              <span className={styles.tdMuted}>—</span>
+                            ) : (
+                              <AnswerCircle letter={r.camoAnswer} color={r.camoAnswer === r.correctAnswer ? "var(--turquoise)" : camoColors[r.camo]} />
+                            )}
+                          </td>
+                          <td className={styles.tdRight}>
+                            <div className={styles.tdTimeBlock}>
+                              <div>
+                                <span className={styles.timeMain}>{r.time}s</span>
+                                <span className={styles.timeDelta} style={{ color: r.delta < 0 ? "var(--turquoise-hc)" : r.delta > 0 ? "var(--perform)" : "var(--text-muted)" }}>
+                                  {r.delta >= 0 ? `+${r.delta}` : r.delta}s
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className={styles.tdCenter}>
+                            <span className={styles.tdMuted}>—</span>
+                          </td>
+                          <td className={styles.tdChevron} aria-hidden>
+                            <span className={styles.tdChevronBtn}>›</span>
+                          </td>
+                        </tr>
+                      )),
+                    ];
+                  });
+                })()}
+                {reviewTab !== "S3" && filteredRows.map((r) => (
                   <tr key={r.id} className={styles.reviewTableRow} onClick={() => setDetailQId(r.id)}>
                     <td className={styles.tdQNum}>
                       {r.id}
-                      {r.repeatWrong && <span className={styles.repeatBadge} title="Repeat wrong">↻</span>}
+                      {r.repeatWrong && (
+                        <span
+                          className={styles.repeatBadge}
+                          title={`You also missed this question ${r.repeatDaysAgo} days ago. Pay special attention to this one.`}
+                        >
+                          ⚠
+                        </span>
+                      )}
                     </td>
-                    <td className={styles.tdCitation}>{r.citation}</td>
+                    <td className={styles.tdCitation}>
+                      <div className={styles.tdCitationLine}>
+                        <span>{r.citation}</span>
+                        <span className={styles.tdCitationIcons} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className={styles.tdCitationIconBtn}
+                            title="Open question detail"
+                            onClick={() => setDetailQId(r.id)}
+                          >ⓘ</button>
+                          <button
+                            className={styles.tdCitationIconBtn}
+                            title="Open in full PT context"
+                            onClick={() => setDetailQId(r.id)}
+                          >↗</button>
+                        </span>
+                      </div>
+                      <div className={styles.tdTagPills}>
+                        {r.tags.map((tag) => (
+                          <button
+                            key={tag}
+                            className={`${styles.tdTagPill} ${reviewTagFilter === tag ? styles.tdTagPillActive : ""}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReviewTagFilter((prev) => (prev === tag ? null : tag));
+                            }}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                    <td className={styles.tdDate}>{r.date}</td>
                     <td>
                       <AnswerCircle letter={r.userAnswer} color={r.userAnswer === "—" ? "var(--pewter)" : r.isCorrect ? "var(--turquoise)" : "var(--perform)"} />
                     </td>
@@ -1809,23 +2348,58 @@ export default function TestTakingInterface() {
                       )}
                     </td>
                     <td className={styles.tdRight}>
-                      <span className={styles.timeMain}>{r.time}s</span>
-                      <span className={styles.timeDelta} style={{ color: r.delta < 0 ? "var(--turquoise-hc)" : r.delta > 0 ? "var(--perform)" : "var(--text-muted)" }}>
-                        {r.delta >= 0 ? `+${r.delta}` : r.delta}s
-                      </span>
+                      <div className={styles.tdTimeBlock} title={`Started at ${r.startedAt}${r.returnedAt ? ` · Returned at ${r.returnedAt}` : ""}`}>
+                        <div>
+                          <span className={styles.timeMain}>{r.time}s</span>
+                          <span className={styles.timeDelta} style={{ color: r.delta < 0 ? "var(--turquoise-hc)" : r.delta > 0 ? "var(--perform)" : "var(--text-muted)" }}>
+                            {r.delta >= 0 ? `+${r.delta}` : r.delta}s
+                          </span>
+                        </div>
+                        <button
+                          className={styles.tdZoneBar}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setZoneExplorerQId(r.id);
+                            setZoneExplorerMode("original");
+                            setZoneExplorerTime(0);
+                          }}
+                          title="Click to open Zone Explorer"
+                        >
+                          {r.zones.map((z, idx) => {
+                            const zoneColor =
+                              z.zone === "Stimulus" ? "var(--seafoam)" :
+                              z.zone === "Stem" ? "var(--turquoise-lc)" :
+                              z.zone === r.correctAnswer ? "var(--turquoise)" :
+                              z.zone === r.userAnswer && !r.isCorrect ? "var(--perform)" :
+                              "var(--pewter)";
+                            return (
+                              <span
+                                key={idx}
+                                className={styles.tdZoneSeg}
+                                style={{ flex: z.duration, background: zoneColor }}
+                                title={`${z.zone}: ${z.duration}s`}
+                              />
+                            );
+                          })}
+                        </button>
+                      </div>
                     </td>
                     <td className={styles.tdCenter} onClick={(e) => e.stopPropagation()}>
                       {!r.isCorrect && r.userAnswer !== "—" ? (
                         <button
-                          className={`${styles.wajBtn} ${wajEntries.has(r.id) ? styles.wajBtnActive : ""}`}
-                          onClick={() => setWajEntries((prev) => {
-                            const next = new Set(prev);
-                            next.has(r.id) ? next.delete(r.id) : next.add(r.id);
-                            return next;
-                          })}
-                          title={wajEntries.has(r.id) ? "Remove from WAJ" : "Add to Wrong Answer Journal"}
+                          className={`${styles.wajBtn} ${isInWaj(r.id) ? styles.wajBtnActive : ""}`}
+                          onClick={() => {
+                            const existing = wajEntries[r.id];
+                            setWajDraft({
+                              whyMissed: existing?.whyMissed ?? "",
+                              whatDifferently: existing?.whatDifferently ?? "",
+                              editing: !(existing?.processed),
+                            });
+                            setWajOpenQId(r.id);
+                          }}
+                          title={isInWaj(r.id) ? "View / edit WAJ entry" : "Add to Wrong Answer Journal"}
                         >
-                          {wajEntries.has(r.id) ? "✓" : "+"}
+                          {isInWaj(r.id) ? "✓" : "+"}
                         </button>
                       ) : (
                         <span className={styles.tdMuted}>—</span>
@@ -1836,6 +2410,17 @@ export default function TestTakingInterface() {
                     </td>
                   </tr>
                 ))}
+                {filteredRows.length === 0 && (
+                  <tr>
+                    <td colSpan={8}>
+                      <div className={styles.reviewEmpty}>
+                        <span className={styles.reviewEmptyIcon} aria-hidden>◎</span>
+                        <span className={styles.reviewEmptyTitle}>No questions match these filters</span>
+                        <span className={styles.reviewEmptyHint}>Clear filters or widen your search to see more.</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </section>
@@ -1844,7 +2429,10 @@ export default function TestTakingInterface() {
         {/* Question Detail Drawer */}
         {detailQId !== null && detailRow && detailQ && (
           <>
-            <div className={styles.drawerOverlay} onClick={() => setDetailQId(null)} />
+            <div
+              className={styles.drawerOverlay}
+              onClick={() => { setDetailQId(null); setDetailTab("question"); setClirVisible(false); }}
+            />
             <aside className={styles.detailDrawer}>
               <header className={styles.drawerHeader}>
                 <div className={styles.drawerHeaderLeft}>
@@ -1860,13 +2448,50 @@ export default function TestTakingInterface() {
                   )}
                   {detailRow.isCorrect && <span className={styles.drawerCamoBadge} style={{ background: "var(--turquoise)", borderColor: "var(--turquoise)" }}>Correct</span>}
                 </div>
-                <button className={styles.drawerClose} onClick={() => setDetailQId(null)}>✕</button>
+                <button className={styles.drawerClose} onClick={() => { setDetailQId(null); setDetailTab("question"); setClirVisible(false); }}>✕</button>
               </header>
 
+              {/* Tabs */}
+              <div className={styles.drawerTabs}>
+                <button
+                  className={`${styles.drawerTab} ${detailTab === "question" ? styles.drawerTabActive : ""}`}
+                  onClick={() => setDetailTab("question")}
+                >Question</button>
+                <button
+                  className={`${styles.drawerTab} ${detailTab === "history" ? styles.drawerTabActive : ""}`}
+                  onClick={() => setDetailTab("history")}
+                >Your History</button>
+              </div>
+
+              {detailTab === "question" ? (
               <div className={styles.drawerBody}>
+                {/* Show CLIR toggle */}
+                <div className={styles.drawerClirRow}>
+                  <button
+                    className={`${styles.drawerClirBtn} ${clirVisible ? styles.drawerClirBtnActive : ""}`}
+                    onClick={() => setClirVisible((v) => !v)}
+                  >
+                    {clirVisible ? "Hide CLIR" : "Show CLIR"}
+                  </button>
+                  <button className={styles.drawerClirBtnDisabled} disabled title="Translation key coming soon">
+                    Show Translation
+                  </button>
+                </div>
+
                 {/* Stimulus */}
                 <div className={styles.drawerStimulus}>
                   <p className={styles.drawerStimulusText}>{detailQ.stimulus}</p>
+                  {clirVisible && (
+                    <div className={styles.drawerClirBox}>
+                      <span className={styles.drawerClirLabel}>CLIR</span>
+                      <p className={styles.drawerClirText}>
+                        Manufacturers made smartphones LIGHTER over a ten-year period, the researchers claim.
+                        The critic counters: the WEIGHTS we measured are at DISCARD time, not purchase. If phones
+                        today are used for SHORTER periods, they lose less component weight before discard —
+                        explaining the observed decrease without any manufacturer change.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Question stem */}
@@ -1915,22 +2540,436 @@ export default function TestTakingInterface() {
                   )}
                 </div>
 
-                {/* WAJ quick-add */}
+                {/* Watch Explanation */}
+                <button
+                  className={styles.drawerClirBtn}
+                  onClick={() => setVideoExplanationQId(detailRow.id)}
+                >
+                  ▶ Watch Explanation
+                </button>
+
+                {/* WAJ quick-add → opens Quick-Fill drawer */}
                 {!detailRow.isCorrect && detailRow.userAnswer !== "—" && (
                   <button
-                    className={`${styles.drawerWajBtn} ${wajEntries.has(detailRow.id) ? styles.drawerWajBtnActive : ""}`}
-                    onClick={() => setWajEntries((prev) => {
-                      const next = new Set(prev);
-                      next.has(detailRow.id) ? next.delete(detailRow.id) : next.add(detailRow.id);
-                      return next;
-                    })}
+                    className={`${styles.drawerWajBtn} ${isInWaj(detailRow.id) ? styles.drawerWajBtnActive : ""}`}
+                    onClick={() => {
+                      const existing = wajEntries[detailRow.id];
+                      setWajDraft({
+                        whyMissed: existing?.whyMissed ?? "",
+                        whatDifferently: existing?.whatDifferently ?? "",
+                        editing: !(existing?.processed),
+                      });
+                      setWajOpenQId(detailRow.id);
+                    }}
                   >
-                    {wajEntries.has(detailRow.id) ? "✓ In Wrong Answer Journal" : "+ Add to Wrong Answer Journal"}
+                    {isInWaj(detailRow.id) ? "✓ View Wrong Answer Journal entry" : "+ Add to Wrong Answer Journal"}
                   </button>
                 )}
               </div>
+              ) : (
+                // History tab — mock chronological encounters
+                <div className={styles.drawerBody}>
+                  {(() => {
+                    const encounters: Array<{ date: string; source: string; result: "correct" | "wrong"; camo?: string; time: number }> = [];
+                    if (detailRow.id % 4 === 0) {
+                      encounters.push({
+                        date: "02/18/26",
+                        source: "Workout: Answer Choice Warmup",
+                        result: "wrong",
+                        camo: "misread",
+                        time: 98,
+                      });
+                    }
+                    if (detailRow.id % 3 === 0) {
+                      encounters.push({
+                        date: "03/05/26",
+                        source: "PT 78 · S2 · LR",
+                        result: "wrong",
+                        camo: "conceptual",
+                        time: 127,
+                      });
+                    }
+                    encounters.push({
+                      date: sectionDate,
+                      source: "PT 92 · S2 · LR",
+                      result: detailRow.isCorrect ? "correct" : "wrong",
+                      camo: detailRow.camo !== "correct" ? labelForCamo(detailRow.camo) : undefined,
+                      time: detailRow.time,
+                    });
+
+                    if (encounters.length === 1) {
+                      return (
+                        <div className={styles.drawerHistoryEmpty}>
+                          <span className={styles.drawerHistoryEmptyLabel}>First attempt</span>
+                          <p className={styles.drawerHistoryEmptyText}>
+                            This is your first encounter with this question. Your ongoing performance on Q{detailRow.id}
+                            will appear here after future attempts in PTs or workouts.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className={styles.drawerHistoryList}>
+                        {encounters.map((e, idx) => (
+                          <div key={idx} className={styles.drawerHistoryItem}>
+                            <div className={styles.drawerHistoryMeta}>
+                              <span className={styles.drawerHistoryDate}>{e.date}</span>
+                              <span className={styles.drawerHistorySource}>{e.source}</span>
+                            </div>
+                            <div className={styles.drawerHistoryResultRow}>
+                              <span
+                                className={`${styles.drawerHistoryResult} ${e.result === "correct" ? styles.drawerHistoryResultCorrect : styles.drawerHistoryResultWrong}`}
+                              >
+                                {e.result === "correct" ? "Correct" : "Wrong"}
+                              </span>
+                              {e.camo && <span className={styles.drawerHistoryCamo}>{e.camo}</span>}
+                              <span className={styles.drawerHistoryTime}>{e.time}s</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </aside>
           </>
+        )}
+
+        {/* WAJ Quick-Fill Drawer */}
+        {wajOpenQId !== null && (() => {
+          const row = reviewRows.find((r) => r.id === wajOpenQId);
+          const q = QUESTIONS.find((qq) => qq.id === wajOpenQId);
+          if (!row || !q) return null;
+          const MAX = 300;
+          const whyLen = wajDraft.whyMissed.length;
+          const whatLen = wajDraft.whatDifferently.length;
+          const canSubmit = whyLen > 0 && whatLen > 0;
+          const existing = wajEntries[wajOpenQId];
+          const readOnly = existing?.processed === true && !wajDraft.editing;
+          return (
+            <>
+              <div
+                className={styles.drawerOverlay}
+                style={{ zIndex: 210 }}
+                onClick={() => { setWajOpenQId(null); setWajDraft({ whyMissed: "", whatDifferently: "", editing: false }); }}
+              />
+              <aside className={styles.wajDrawer}>
+                <header className={styles.drawerHeader}>
+                  <div className={styles.drawerHeaderLeft}>
+                    <span className={styles.drawerQNum}>Wrong Answer Journal</span>
+                    <span className={styles.drawerCitation}>Q{row.id} · {row.citation}</span>
+                  </div>
+                  <button
+                    className={styles.drawerClose}
+                    onClick={() => { setWajOpenQId(null); setWajDraft({ whyMissed: "", whatDifferently: "", editing: false }); }}
+                  >✕</button>
+                </header>
+
+                <div className={styles.drawerBody}>
+                  <div className={styles.wajField}>
+                    <label className={styles.wajLabel}>Why did you miss this question?</label>
+                    <textarea
+                      className={styles.wajTextarea}
+                      value={wajDraft.whyMissed}
+                      onChange={(e) => setWajDraft((d) => ({ ...d, whyMissed: e.target.value.slice(0, MAX) }))}
+                      maxLength={MAX}
+                      readOnly={readOnly}
+                      placeholder="What led you to the wrong answer? Specific error, assumption, phrase you misread…"
+                      rows={5}
+                    />
+                    <span
+                      className={styles.wajCounter}
+                      style={{ color: whyLen >= 290 ? "var(--perform)" : "var(--text-muted)" }}
+                    >
+                      {whyLen} / {MAX}
+                    </span>
+                  </div>
+
+                  <div className={styles.wajField}>
+                    <label className={styles.wajLabel}>What will you do differently next time?</label>
+                    <textarea
+                      className={styles.wajTextarea}
+                      value={wajDraft.whatDifferently}
+                      onChange={(e) => setWajDraft((d) => ({ ...d, whatDifferently: e.target.value.slice(0, MAX) }))}
+                      maxLength={MAX}
+                      readOnly={readOnly}
+                      placeholder="Concrete tactic or rule you'll apply on the next question of this type…"
+                      rows={5}
+                    />
+                    <span
+                      className={styles.wajCounter}
+                      style={{ color: whatLen >= 290 ? "var(--perform)" : "var(--text-muted)" }}
+                    >
+                      {whatLen} / {MAX}
+                    </span>
+                  </div>
+
+                  <div className={styles.wajActions}>
+                    {readOnly ? (
+                      <button
+                        className={styles.wajEditBtn}
+                        onClick={() => setWajDraft((d) => ({ ...d, editing: true }))}
+                      >
+                        Edit entry
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className={styles.wajCancelBtn}
+                          onClick={() => {
+                            setWajOpenQId(null);
+                            setWajDraft({ whyMissed: "", whatDifferently: "", editing: false });
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className={styles.wajSubmitBtn}
+                          disabled={!canSubmit}
+                          onClick={() => {
+                            setWajEntries((prev) => ({
+                              ...prev,
+                              [wajOpenQId as number]: {
+                                whyMissed: wajDraft.whyMissed,
+                                whatDifferently: wajDraft.whatDifferently,
+                                processed: true,
+                              },
+                            }));
+                            setWajOpenQId(null);
+                            setWajDraft({ whyMissed: "", whatDifferently: "", editing: false });
+                          }}
+                        >
+                          {existing?.processed ? "Save changes" : "Submit to WAJ"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </aside>
+            </>
+          );
+        })()}
+
+        {/* Zone Explorer Popup */}
+        {zoneExplorerQId !== null && (() => {
+          const row = reviewRows.find((r) => r.id === zoneExplorerQId);
+          if (!row) return null;
+          const totalTime = row.zones.reduce((s, z) => s + z.duration, 0);
+          const cursorZoneIdx = (() => {
+            let acc = 0;
+            for (let i = 0; i < row.zones.length; i++) {
+              acc += row.zones[i].duration;
+              if (zoneExplorerTime <= acc) return i;
+            }
+            return row.zones.length - 1;
+          })();
+          const cursorZone = row.zones[cursorZoneIdx];
+          const actionLog = row.zones.flatMap((z, i) => {
+            let cumulative = 0;
+            for (let j = 0; j < i; j++) cumulative += row.zones[j].duration;
+            return [
+              { t: cumulative, action: `Entered ${z.zone}` },
+              ...(z.zone === row.correctAnswer ? [{ t: cumulative + Math.floor(z.duration / 2), action: `Considered ${z.zone} (correct)` }] : []),
+              ...(z.zone === row.userAnswer && !row.isCorrect ? [{ t: cumulative + z.duration - 2, action: `Selected ${z.zone}` }] : []),
+            ];
+          });
+          return (
+            <>
+              <div
+                className={styles.drawerOverlay}
+                style={{ zIndex: 230 }}
+                onClick={() => setZoneExplorerQId(null)}
+              />
+              <div className={styles.zoneExplorer}>
+                <header className={styles.zoneExplorerHeader}>
+                  <div>
+                    <span className={styles.drawerQNum}>Q{row.id} · Zone Explorer</span>
+                    <span className={styles.drawerCitation}>{row.citation}</span>
+                  </div>
+                  <div className={styles.zoneExplorerToggle}>
+                    <button
+                      className={`${styles.zoneModeBtn} ${zoneExplorerMode === "original" ? styles.zoneModeBtnActive : ""}`}
+                      onClick={() => setZoneExplorerMode("original")}
+                    >Original</button>
+                    <button
+                      className={`${styles.zoneModeBtn} ${zoneExplorerMode === "camo" ? styles.zoneModeBtnActive : ""}`}
+                      onClick={() => setZoneExplorerMode("camo")}
+                      disabled={!row.isInCamo}
+                      title={!row.isInCamo ? "No Camo attempt for this question" : undefined}
+                    >Camo</button>
+                  </div>
+                  <button
+                    className={styles.drawerClose}
+                    onClick={() => setZoneExplorerQId(null)}
+                  >✕</button>
+                </header>
+
+                <div className={styles.zoneExplorerBody}>
+                  {/* Scrubbable timeline */}
+                  <div className={styles.zoneTimelineWrap}>
+                    <div className={styles.zoneTimelineHeader}>
+                      <span>Scrubbable Timeline</span>
+                      <span className={styles.zoneTimelineClock}>
+                        {zoneExplorerTime}s / {totalTime}s
+                      </span>
+                    </div>
+                    <div className={styles.zoneTimelineBar}>
+                      {row.zones.map((z, idx) => {
+                        const zoneColor =
+                          z.zone === "Stimulus" ? "var(--seafoam)" :
+                          z.zone === "Stem" ? "var(--turquoise-lc)" :
+                          z.zone === row.correctAnswer ? "var(--turquoise)" :
+                          z.zone === row.userAnswer && !row.isCorrect ? "var(--perform)" :
+                          "var(--pewter)";
+                        return (
+                          <button
+                            key={idx}
+                            className={`${styles.zoneTimelineSeg} ${idx === cursorZoneIdx ? styles.zoneTimelineSegActive : ""}`}
+                            style={{ flex: z.duration, background: zoneColor }}
+                            onClick={() => {
+                              let before = 0;
+                              for (let j = 0; j < idx; j++) before += row.zones[j].duration;
+                              setZoneExplorerTime(before);
+                            }}
+                            title={`${z.zone} · ${z.duration}s`}
+                          >
+                            <span className={styles.zoneTimelineSegLabel}>{z.zone}</span>
+                          </button>
+                        );
+                      })}
+                      <input
+                        type="range"
+                        className={styles.zoneTimelineScrubber}
+                        min={0}
+                        max={totalTime}
+                        value={zoneExplorerTime}
+                        onChange={(e) => setZoneExplorerTime(Number(e.target.value))}
+                      />
+                    </div>
+                    <div className={styles.zoneTimelineControls}>
+                      <button
+                        className={styles.zoneCtrlBtn}
+                        onClick={() => setZoneExplorerTime((t) => Math.max(0, t - 5))}
+                      >⏮</button>
+                      <button
+                        className={`${styles.zoneCtrlBtn} ${styles.zoneCtrlBtnPrimary}`}
+                        onClick={() => setZoneExplorerTime((t) => Math.min(totalTime, t + 5))}
+                      >▶</button>
+                      <button
+                        className={styles.zoneCtrlBtn}
+                        onClick={() => setZoneExplorerTime((t) => Math.min(totalTime, t + 10))}
+                      >⏭</button>
+                    </div>
+                  </div>
+
+                  {/* Current zone snapshot */}
+                  <div className={styles.zoneSnapshot}>
+                    <div className={styles.zoneSnapshotLabel}>
+                      At {zoneExplorerTime}s — cursor in <strong>{cursorZone.zone}</strong>
+                    </div>
+                    <div className={styles.zoneSnapshotStage}>
+                      <div className={styles.zoneSnapshotStim}>
+                        <span className={styles.zoneSnapshotStageLabel}>Stimulus</span>
+                        <div className={styles.zoneSnapshotText}>
+                          {cursorZone.zone === "Stimulus" ? "▓▓▓▓▓▓▓ reading focus ▓▓▓▓▓▓▓" : "…"}
+                        </div>
+                      </div>
+                      <div className={styles.zoneSnapshotAns}>
+                        <span className={styles.zoneSnapshotStageLabel}>Answers</span>
+                        {["A", "B", "C", "D", "E"].map((L) => (
+                          <div
+                            key={L}
+                            className={`${styles.zoneSnapshotAnsRow} ${L === cursorZone.zone ? styles.zoneSnapshotAnsActive : ""}`}
+                          >
+                            {L}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action log */}
+                  <div className={styles.zoneActionLog}>
+                    <div className={styles.zoneActionLogHeader}>Action Log</div>
+                    {actionLog.map((a, idx) => (
+                      <div
+                        key={idx}
+                        className={`${styles.zoneActionEntry} ${a.t === zoneExplorerTime ? styles.zoneActionEntryActive : ""}`}
+                      >
+                        <span className={styles.zoneActionTime}>{a.t}s</span>
+                        <span className={styles.zoneActionText}>{a.action}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {row.isInCamo && zoneExplorerMode === "camo" && (
+                    <div className={styles.zoneCamoNote}>
+                      <strong>Camo Replication:</strong> showing your Camo attempt path. Note
+                      where you hovered differently this time.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          );
+        })()}
+
+        {/* Video Explanation Drawer */}
+        {videoExplanationQId !== null && (
+          <>
+            <div
+              className={styles.drawerOverlay}
+              style={{ zIndex: 230 }}
+              onClick={() => setVideoExplanationQId(null)}
+            />
+            <aside className={styles.wajDrawer}>
+              <header className={styles.drawerHeader}>
+                <div className={styles.drawerHeaderLeft}>
+                  <span className={styles.drawerQNum}>Watch Explanation</span>
+                  <span className={styles.drawerCitation}>Q{videoExplanationQId}</span>
+                </div>
+                <button
+                  className={styles.drawerClose}
+                  onClick={() => setVideoExplanationQId(null)}
+                >✕</button>
+              </header>
+              <div className={styles.drawerBody}>
+                <div className={styles.videoPlayerMock}>
+                  <span className={styles.videoPlayBtn} aria-hidden>▶</span>
+                  <span className={styles.videoPlayHint}>Video explanation · 4:32</span>
+                </div>
+                <p className={styles.videoTranscript}>
+                  Chandler breaks down this question step-by-step: the argument structure, why the
+                  trap answer looks tempting, and what phrase to lock in on next time.
+                </p>
+              </div>
+            </aside>
+          </>
+        )}
+
+        {/* Delete confirmation modal */}
+        {deleteModal && (
+          <div className={styles.deleteOverlay} onClick={() => setDeleteModal(null)}>
+            <div className={styles.deleteModal} onClick={(e) => e.stopPropagation()}>
+              <h3 className={styles.deleteTitle}>
+                {deleteModal === "section" ? "Delete this section?" : "Delete this PT attempt?"}
+              </h3>
+              <p className={styles.deleteBody}>
+                {deleteModal === "section"
+                  ? "This permanently removes the section from Analytics, deletes all associated Wrong Answers Journal entries, and recalculates your personal bests and scaled scores. This action cannot be undone."
+                  : "This removes ALL sections from this PT attempt in a single batch, deletes associated WAJ entries, and recalculates your personal bests. This action cannot be undone."}
+              </p>
+              <div className={styles.deleteActions}>
+                <button className={styles.wajCancelBtn} onClick={() => setDeleteModal(null)}>Cancel</button>
+                <button
+                  className={styles.deleteConfirmBtn}
+                  onClick={() => { setDeleteModal(null); setReviewMenuOpen(false); }}
+                >Delete</button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     );
