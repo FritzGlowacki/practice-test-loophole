@@ -2977,52 +2977,47 @@ export default function TestTakingInterface() {
 
   return (
     <div className={styles.container}>
+     <button className={styles.backToLaunchBtn} onClick={() => setScreen("launch")}>
+       ← Back to Launch Page
+     </button>
      <div className={styles.contentWrap}>
-      {/* Header */}
+      {/* Header — PT_Test_v2.1: simplified, only section label + compound Timer pill */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          <span className={styles.sectionLabel}>PT 92 — LR Section 1</span>
-          <span className={styles.questionLabel}>{question.id} / {totalQuestions} Complete</span>
-        </div>
-
-        <div className={styles.headerCenter}>
-          {timerVisible && (
-            <div className={styles.timerArea} onClick={() => setTimerVisible(false)}>
-              <span className={styles.timerValue}>{formatTime(timerSeconds)}</span>
-              <div className={styles.progressBar}>
-                <div
-                  className={styles.progressFill}
-                  style={{ width: `${timerProgress * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-          {!timerVisible && (
-            <div
-              className={styles.timerHidden}
-              onClick={() => setTimerVisible(true)}
-            >
-              <span className={styles.timerHiddenLabel}>Timer hidden</span>
-            </div>
-          )}
+          <span className={styles.sectionLabel}>PT 92 - LR Section 1</span>
+          <span className={styles.questionLabel}>{answeredCount} / {totalQuestions} Complete</span>
         </div>
 
         <div className={styles.headerRight}>
-          <button
-            className={styles.pauseBtn}
-            onClick={() => setIsPaused(!isPaused)}
-            title="Pause section"
-          >
-            {isPaused ? "▶" : "⏸"}
-          </button>
-          <button
-            className={`${styles.flagBtn} ${flaggedQuestions.has(question.id) ? styles.flagActive : ""}`}
-            onClick={toggleFlag}
-            title="Flag for review"
-          >
-            ⚑
-          </button>
-          <button className={styles.completeBtn} onClick={() => setScreen("transition")}>Complete Section</button>
+          <div className={styles.timerV2}>
+            <button
+              className={styles.timerV2PauseBtn}
+              onClick={() => setIsPaused(!isPaused)}
+              title={isPaused ? "Resume section" : "Pause section"}
+            >
+              {isPaused ? "▶" : "⏸"}
+            </button>
+            {timerVisible ? (
+              <>
+                <div className={styles.timerV2Bar}>
+                  <div
+                    className={styles.timerV2BarFill}
+                    style={{ width: `${timerProgress * 100}%` }}
+                  />
+                </div>
+                <span className={styles.timerV2Value}>{formatTime(timerSeconds)}</span>
+              </>
+            ) : (
+              <span className={styles.timerV2HiddenLabel}>Timer hidden</span>
+            )}
+            <button
+              className={styles.timerV2EyeBtn}
+              onClick={() => setTimerVisible(!timerVisible)}
+              title={timerVisible ? "Hide timer" : "Show timer"}
+            >
+              {timerVisible ? "👁" : "⊘"}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -3044,15 +3039,9 @@ export default function TestTakingInterface() {
           </div>
         </div>
         <div className={styles.toolbarRight}>
-          <button className={styles.highlightBtn} title="Pink highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("pink")}>
-            <img src="/icons/Brush_Pink.svg" alt="Pink highlight" width={15} height={16} draggable={false} />
-          </button>
-          <button className={styles.highlightBtn} title="Orange highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("orange")}>
-            <img src="/icons/Brush_Orange.svg" alt="Orange highlight" width={15} height={16} draggable={false} />
-          </button>
-          <button className={styles.highlightBtn} title="Yellow highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("yellow")}>
-            <img src="/icons/Brush_Yellow.svg" alt="Yellow highlight" width={15} height={16} draggable={false} />
-          </button>
+          <button className={`${styles.highlightBtn} ${styles.highlightPink}`} title="Pink highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("pink")} />
+          <button className={`${styles.highlightBtn} ${styles.highlightOrange}`} title="Orange highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("orange")} />
+          <button className={`${styles.highlightBtn} ${styles.highlightYellow}`} title="Yellow highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("yellow")} />
           <button className={styles.toolBtn} title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("underline")}>U̲</button>
           <button className={styles.toolBtn} title="Eraser" onMouseDown={(e) => e.preventDefault()} onClick={eraseHighlight}>⌫</button>
           <span className={styles.toolbarDivider} />
@@ -3083,34 +3072,7 @@ export default function TestTakingInterface() {
               </div>
             )}
           </div>
-          <div className={styles.toolBtnWrap}>
-            <button
-              className={`${styles.toolBtn} ${lineHeightOpen ? styles.toolBtnActive : ""}`}
-              title="Line height"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setLineHeightOpen((o) => !o); setTextSizeOpen(false); }}
-            >↕</button>
-            {lineHeightOpen && (
-              <div className={styles.toolDropdown}>
-                <span className={styles.toolDropdownHeader}>Line height</span>
-                {(["default", "medium", "large"] as const).map((v) => (
-                  <button
-                    key={v}
-                    className={`${styles.toolDropdownRow} ${lineHeight === v ? styles.toolDropdownRowActive : ""}`}
-                    onClick={() => { setPersistedLineHeight(v); setLineHeightOpen(false); }}
-                  >
-                    <span className={styles.toolRadio} aria-hidden>
-                      {lineHeight === v && <span className={styles.toolRadioDot} />}
-                    </span>
-                    <div className={styles.toolDropdownBody}>
-                      <span className={styles.toolDropdownLabel}>{v === "default" ? "Default" : v === "medium" ? "Medium" : "Large"}</span>
-                      <span className={styles.toolDropdownMeta}>{lineHeightNum[v]}×</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Line height dropdown removed in v2.1 */}
         </div>
       </div>
 
@@ -3136,8 +3098,20 @@ export default function TestTakingInterface() {
 
         {/* Right Panel — Question & Answers */}
         <div className={styles.rightPanel}>
-          <div className={styles.questionStem}>
-            <p>{renderStyledText(question.stem, false)}</p>
+          <div className={styles.questionStemRow}>
+            <div className={styles.questionStem}>
+              <p>
+                <span className={styles.questionStemNum}>{question.id}.</span>{" "}
+                {renderStyledText(question.stem, false)}
+              </p>
+            </div>
+            <button
+              className={`${styles.flagBtn} ${flaggedQuestions.has(question.id) ? styles.flagActive : ""}`}
+              onClick={toggleFlag}
+              title="Flag for review"
+            >
+              ⚑
+            </button>
           </div>
 
           <div className={styles.answersList}>
@@ -3181,18 +3155,8 @@ export default function TestTakingInterface() {
         </div>
       </main>
 
-      {/* Question Navigation Bar */}
+      {/* Question Navigation Bar — PT_Test_v2.1: numbers left, Prev/Next + Complete right */}
       <footer className={styles.footer}>
-        <div className={styles.navArrow}>
-          <button
-            className={styles.arrowBtn}
-            disabled={currentQuestion === 0}
-            onClick={() => goToQuestion(currentQuestion - 1)}
-          >
-            Prev
-          </button>
-        </div>
-
         <div className={styles.questionNav}>
           {QUESTIONS.map((q, i) => {
             const isAnswered = selectedAnswers[q.id] !== undefined;
@@ -3214,13 +3178,23 @@ export default function TestTakingInterface() {
           })}
         </div>
 
-        <div className={styles.navArrow}>
+        <div className={styles.navButtons}>
+          <button
+            className={styles.arrowBtn}
+            disabled={currentQuestion === 0}
+            onClick={() => goToQuestion(currentQuestion - 1)}
+          >
+            Prev
+          </button>
           <button
             className={styles.arrowBtn}
             disabled={currentQuestion === totalQuestions - 1}
             onClick={() => goToQuestion(currentQuestion + 1)}
           >
             Next
+          </button>
+          <button className={styles.completeBtn} onClick={() => setScreen("transition")}>
+            Complete Section
           </button>
         </div>
       </footer>

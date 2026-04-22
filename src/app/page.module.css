@@ -7,13 +7,34 @@
   background: var(--bg-page);
 }
 
+/* ===== PT_Test_v2.1: Back to Launch Page — outside content, top-left ===== */
+.backToLaunchBtn {
+  align-self: flex-start;
+  margin: 0 0 16px 56px;
+  padding: 10px 20px;
+  background: var(--bg-white);
+  border: 2px solid var(--text-primary);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.backToLaunchBtn:hover {
+  box-shadow: 2px 2px 0 0 var(--text-primary);
+}
+
 /* ===== Content wrapper — matches Figma inset pattern (150/32, 1140×871) ===== */
 .contentWrap {
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 1140px;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 96px);
   margin: 0 auto;
   background: var(--bg-white);
   border: 3px solid var(--text-primary);
@@ -116,40 +137,116 @@
   gap: 10px;
 }
 
-.pauseBtn {
+/* ===== PT_Test_v2.1: compound Timer pill ===== */
+.timerV2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 4px;
   background: var(--bg-white);
-  border: 3px solid var(--text-primary);
+  border: 2px solid var(--text-primary);
+  border-radius: 999px;
+  min-height: 38px;
+}
+
+.timerV2PauseBtn,
+.timerV2EyeBtn {
+  background: var(--bg-white);
+  border: 1.5px solid var(--text-primary);
   color: var(--text-primary);
-  font-size: 14px;
-  width: 40px;
-  height: 40px;
+  font-size: 12px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease-out;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-.pauseBtn:hover {
-  box-shadow: 4px 4px 0px 0px var(--text-primary);
+.timerV2PauseBtn:hover,
+.timerV2EyeBtn:hover {
+  background: var(--bg-alternate);
+}
+
+.timerV2Bar {
+  width: 54px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.timerV2BarFill {
+  height: 100%;
+  background: var(--turquoise);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.timerV2Value {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+  min-width: 44px;
+  text-align: right;
+}
+
+.timerV2HiddenLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 0 8px;
+}
+
+.timerV2HiddenBtn {
+  background: transparent;
+  border: none;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* ===== Flag button — now on question stem row (right side) ===== */
+.questionStemRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.questionStemRow .questionStem {
+  flex: 1;
+}
+
+.questionStemNum {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-right: 4px;
 }
 
 .flagBtn {
   background: var(--bg-white);
-  border: 3px solid var(--text-primary);
+  border: 2px solid var(--text-primary);
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: 16px;
   width: 40px;
   height: 40px;
+  min-width: 40px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
   transition: all 0.2s ease-out;
+  flex-shrink: 0;
 }
 
 .flagBtn:hover {
-  box-shadow: 4px 4px 0px 0px var(--text-primary);
+  box-shadow: 2px 2px 0px 0px var(--text-primary);
 }
 
 .flagActive {
@@ -157,21 +254,23 @@
   background: rgba(255, 171, 0, 0.15);
 }
 
+/* Complete Section pill — moved to footer nav buttons group */
 .completeBtn {
   background: #EAF84F;
   color: var(--text-primary);
-  border: 3px solid var(--text-primary);
-  padding: 10px 20px;
+  border: 2px solid var(--text-primary);
+  padding: 8px 18px;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  transition: all 0.2s ease-out;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
 }
 
 .completeBtn:hover {
-  box-shadow: 4px 4px 0px 0px var(--text-primary);
+  box-shadow: 2px 2px 0px 0px var(--text-primary);
 }
 
 /* ===== Toolbar ===== */
@@ -217,21 +316,22 @@
 }
 
 .highlightBtn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   border: 2px solid var(--text-primary);
-  background: var(--bg-white);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 0;
   transition: all 0.2s ease-out;
 }
 
 .highlightBtn:hover {
   box-shadow: 2px 2px 0px 0px var(--text-primary);
 }
+
+.highlightPink { background: var(--highlight-pink); }
+.highlightOrange { background: var(--highlight-orange); }
+.highlightYellow { background: var(--highlight-yellow); }
 
 .toolbarDivider {
   width: 1px;
@@ -457,25 +557,29 @@
   border-color: var(--red) !important;
 }
 
-/* ===== Footer / Navigation Bar ===== */
+/* ===== Footer / Navigation Bar — PT_Test_v2.1: numbers left, buttons right ===== */
 .footer {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   padding: 10px 20px;
   background: var(--bg-white);
-  border: 3px solid var(--text-primary);
-  border-radius: 999px;
-  margin: 12px auto 8px;
-  min-height: 52px;
-  gap: 0;
-  width: fit-content;
-  max-width: calc(100% - 32px);
+  border-top: 2px solid var(--text-primary);
+  min-height: 64px;
+  gap: 16px;
+  width: 100%;
 }
 
 .navArrow {
   display: flex;
   align-items: center;
+}
+
+.navButtons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .arrowBtn {
