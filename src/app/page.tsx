@@ -3008,7 +3008,7 @@ export default function TestTakingInterface() {
                 <span className={styles.timerV2Value}>{formatTime(timerSeconds)}</span>
               </>
             ) : (
-              <span className={styles.timerV2HiddenLabel}>Timer hidden</span>
+              <span className={styles.timerV2Value}>--:--</span>
             )}
             <button
               className={styles.timerV2EyeBtn}
@@ -3044,7 +3044,6 @@ export default function TestTakingInterface() {
           <button className={`${styles.highlightBtn} ${styles.highlightYellow}`} title="Yellow highlight" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("yellow")} />
           <button className={styles.toolBtn} title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHighlight("underline")}>U̲</button>
           <button className={styles.toolBtn} title="Eraser" onMouseDown={(e) => e.preventDefault()} onClick={eraseHighlight}>⌫</button>
-          <span className={styles.toolbarDivider} />
           <div className={styles.toolBtnWrap}>
             <button
               className={`${styles.toolBtn} ${textSizeOpen ? styles.toolBtnActive : ""}`}
@@ -3186,16 +3185,21 @@ export default function TestTakingInterface() {
           >
             Prev
           </button>
-          <button
-            className={styles.arrowBtn}
-            disabled={currentQuestion === totalQuestions - 1}
-            onClick={() => goToQuestion(currentQuestion + 1)}
-          >
-            Next
-          </button>
-          <button className={styles.completeBtn} onClick={() => setScreen("transition")}>
-            Complete Section
-          </button>
+          {currentQuestion === totalQuestions - 1 ? (
+            <button
+              className={`${styles.arrowBtn} ${styles.arrowBtnComplete}`}
+              onClick={() => setScreen("transition")}
+            >
+              Complete Section
+            </button>
+          ) : (
+            <button
+              className={styles.arrowBtn}
+              onClick={() => goToQuestion(currentQuestion + 1)}
+            >
+              Next
+            </button>
+          )}
         </div>
       </footer>
      </div>

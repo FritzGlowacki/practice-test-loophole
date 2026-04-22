@@ -303,38 +303,46 @@
   gap: 8px;
 }
 
+/* Toolbar right — Figma v2.1: gap 8, no divider */
 .toolbarRight {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
+/* Tool buttons — Figma v2.1: highlighters 28×28 stroke 2px, Header buttons 40×28 stroke 2px */
 .toolBtn {
   background: var(--bg-white);
   border: 2px solid var(--text-primary);
   color: var(--text-primary);
-  font-size: 13px;
-  width: 32px;
-  height: 32px;
+  font-size: 12px;
+  width: 40px;
+  height: 28px;
+  min-width: 40px;
   border-radius: 999px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease-out;
+  cursor: pointer;
 }
 
 .toolBtn:hover {
   box-shadow: 2px 2px 0px 0px var(--text-primary);
 }
 
+/* Highlighter — Figma v2.1: 28×28 filled circle, stroke 2px */
 .highlightBtn {
   width: 28px;
   height: 28px;
+  min-width: 28px;
   border-radius: 999px;
   border: 2px solid var(--text-primary);
   cursor: pointer;
   padding: 0;
   transition: all 0.2s ease-out;
+  flex-shrink: 0;
 }
 
 .highlightBtn:hover {
@@ -612,20 +620,28 @@
   height: 37px;
 }
 
+/* Arrow button — Figma v2.1: 80×37 pill, stroke 3px, padding 8/20, Inter Bold 12px */
 .arrowBtn {
   background: var(--bg-white);
   border: 3px solid var(--text-primary);
   color: var(--text-primary);
+  font-family: "Inter", sans-serif;
   font-size: 12px;
   font-weight: 700;
-  padding: 7px 20px;
+  padding: 8px 20px;
+  min-width: 80px;
+  height: 37px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   transition: all 0.2s ease-out;
+  cursor: pointer;
+}
+
+/* Last-question Complete variant — wider pill 177×37 per Figma Last_Question frame */
+.arrowBtnComplete {
+  min-width: 177px;
 }
 
 .arrowBtn:hover:not(:disabled) {
